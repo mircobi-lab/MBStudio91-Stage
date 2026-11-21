@@ -9,4 +9,6 @@ namespace AppPaths
     juce::File pluginListFile();      // plugins.xml
     juce::File deadMansPedalFile();   // scan-in-corso.txt
     juce::File machineSettingsFile(); // macchina.settings
+    juce::File keyboardsFile();       // tastiere.xml
+    juce::File stationsFile();        // postazioni.xml
 }

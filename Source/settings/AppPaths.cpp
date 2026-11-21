@@ -14,4 +14,6 @@ namespace AppPaths
     juce::File pluginListFile()      { return dataDir().getChildFile ("plugins.xml"); }
     juce::File deadMansPedalFile()   { return dataDir().getChildFile ("scan-in-corso.txt"); }
     juce::File machineSettingsFile() { return dataDir().getChildFile ("macchina.settings"); }
+    juce::File keyboardsFile()       { return dataDir().getChildFile ("tastiere.xml"); }
+    juce::File stationsFile()        { return dataDir().getChildFile ("postazioni.xml"); }
 }
