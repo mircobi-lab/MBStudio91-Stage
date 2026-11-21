@@ -4,6 +4,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "Push2Display.h"
+#include "Push2Screen.h"
 
 #include <array>
 #include <map>
@@ -23,8 +24,9 @@ public:
 private:
     struct Setup
     {
-        juce::String name;
+        juce::String name;   // nome del plugin
         juce::Colour colour;
+        int device;          // indice in deviceNames
     };
 
     // MIDI

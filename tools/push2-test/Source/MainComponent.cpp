@@ -1,6 +1,5 @@
 #include "MainComponent.h"
 #include "Push2Protocol.h"
-#include "Push2Screen.h"
 
 #include "BinaryData.h"
 
@@ -12,14 +11,16 @@ const juce::Colour panelGrey { 0xff8a8a8a };
 
 MainComponent::MainComponent()
 {
-    setups = { { { "Piano",    juce::Colour (0xfff2e6cc) },
-                 { "Rhodes",   juce::Colour (0xffff8c1a) },
-                 { "Sylenth1", juce::Colour (0xff1ad1ff) },
-                 { "DUNE 2",   juce::Colour (0xff9b4dff) },
-                 { "Acido",    juce::Colour (0xffb8ff1a) },
-                 { "ICX7",     juce::Colour (0xff1a5cff) },
-                 { "MuMU",     juce::Colour (0xffff2a1a) },
-                 { "LA-91",    juce::Colour (0xffff1aa8) } } };
+    // Abbinamenti plugin/periferica provvisori: i pianoforti sulla Keystation 88
+    enum { lkMini1, lkMini2, lk61, ks88 };
+    setups = { { { "Piano",    juce::Colour (0xfff2e6cc), ks88 },
+                 { "Rhodes",   juce::Colour (0xffff8c1a), lk61 },
+                 { "Sylenth1", juce::Colour (0xff1ad1ff), lk61 },
+                 { "DUNE 2",   juce::Colour (0xff9b4dff), lkMini2 },
+                 { "Acido",    juce::Colour (0xffb8ff1a), lkMini1 },
+                 { "ICX7",     juce::Colour (0xff1a5cff), lk61 },
+                 { "MuMU",     juce::Colour (0xffff2a1a), lkMini2 },
+                 { "LA-91",    juce::Colour (0xffff1aa8), lk61 } } };
 
     bebas = juce::Typeface::createSystemTypefaceFor (BinaryData::BebasNeueRegular_ttf,
                                                      BinaryData::BebasNeueRegular_ttfSize);
@@ -339,10 +340,13 @@ void MainComponent::selectSetup (int index)
 
 void MainComponent::renderDisplay()
 {
+    static const std::array<StyledText, 4> deviceNames { devices::launchkeyMiniMk1(), devices::launchkeyMiniMk2(),
+                                                         devices::launchkey61Mk2(), devices::keystation88Mk3() };
     std::vector<ScreenSetup> list;
     for (const auto& s : setups)
-        list.push_back ({ s.name, s.colour });
-    display.setImage (renderScreen (list, activeSetup, firmware ? firmware->upToFirstOccurrenceOf (" ", false, false) : juce::String(), bebas));
+        list.push_back ({ s.name, deviceNames[(size_t) s.device], s.colour });
+    display.setImage (renderScreen (list, activeSetup, devices::launchpadMiniMk1(),
+                                    firmware ? firmware->upToFirstOccurrenceOf (" ", false, false) : juce::String(), bebas));
     repaint();
 }
 
