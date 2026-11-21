@@ -20,6 +20,7 @@ set(STAGE_CORE_SOURCES
     Source/settings/AppPaths.cpp
     Source/engine/NoteTracker.cpp
     Source/engine/MidiPanic.cpp
+    Source/engine/Station.cpp
 )
 
 set(STAGE_DEFINITIONS
