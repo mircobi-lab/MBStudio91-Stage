@@ -4,13 +4,17 @@
 #include "engine/StageEngine.h"
 #include "plugins/PluginCatalog.h"
 #include "StationPanel.h"
+#include "PatchPanel.h"
+#include "control/SurfaceCoordinator.h"
 
 // Finestra principale: barra superiore, 4 postazioni affiancate, riga di stato.
 class MainComponent final : public juce::Component,
                             private juce::Timer
 {
 public:
-    MainComponent (StageEngine&, PluginCatalog&);
+    MainComponent (StageEngine&, PluginCatalog&, PatchManager&, Library&, SurfaceCoordinator&);
+
+    std::function<void()> onLibraryChanged;
     ~MainComponent() override;
 
     void paint (juce::Graphics&) override;
@@ -22,14 +26,24 @@ private:
     void timerCallback() override;
     void showAudioSettings();
     void startScan();
+    void refreshClockMenu();
+    void tempoControlsChanged();
 
     StageEngine& engine;
     PluginCatalog& catalog;
+    PatchManager& patches;
+    SurfaceCoordinator& coordinator;
 
     juce::TextButton audioButton { "IMPOSTAZIONI AUDIO" }, scanButton { "SCANSIONA PLUGIN" },
                      panicButton { "PANIC" };
-    juce::Label title, statusLabel;
+    juce::Label title, statusLabel, clockLabel { {}, "CLOCK DA" }, clockLost;
+    juce::TextButton tempoSourceButton { "INT" }, tapButton { "TAP" };
+    juce::Slider bpm { juce::Slider::IncDecButtons, juce::Slider::TextBoxLeft };
+    juce::ComboBox clockMenu;
+    juce::StringArray clockIds;
+    juce::MidiDeviceListConnection midiDevicesChanged;
     std::array<std::unique_ptr<StationPanel>, StageEngine::numStations> panels;
+    std::unique_ptr<PatchPanel> patchPanel;
 
     juce::String statusMessage;
     juce::Component::SafePointer<juce::DialogWindow> audioSettingsWindow;

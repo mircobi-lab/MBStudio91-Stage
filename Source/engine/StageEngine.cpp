@@ -346,6 +346,10 @@ void StageEngine::loadKeyboardSettings()
         const auto tree = juce::ValueTree::fromXml (*xml);
         for (int i = 0; i < numStations && i < tree.getNumChildren(); ++i)
             processors[(size_t) i].setZone (KeyZone::fromValueTree (tree.getChild (i)));
+        tempoTracker.setBpm ((double) tree.getProperty ("bpm", 120.0));
+        tempoTracker.setSource ((int) tree.getProperty ("tempoEsterno", 0) != 0 ? TempoTracker::Source::external
+                                                                               : TempoTracker::Source::internal);
+        setClockSourceDevice (tree.getProperty ("clockDa").toString());
     }
 }
 
@@ -355,6 +359,9 @@ void StageEngine::saveKeyboardSettings() const
         xml->writeTo (AppPaths::keyboardsFile());
 
     juce::ValueTree tree ("POSTAZIONI");
+    tree.setProperty ("bpm", tempoTracker.getSource() == TempoTracker::Source::internal ? tempoTracker.getBpm() : 120.0, nullptr);
+    tree.setProperty ("tempoEsterno", tempoTracker.getSource() == TempoTracker::Source::external ? 1 : 0, nullptr);
+    tree.setProperty ("clockDa", getClockSourceDevice(), nullptr);
     for (const auto& p : processors)
         tree.appendChild (p.getZone().toValueTree(), nullptr);
     if (auto xml = tree.createXml())

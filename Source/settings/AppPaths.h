@@ -11,4 +11,5 @@ namespace AppPaths
     juce::File machineSettingsFile(); // macchina.settings
     juce::File keyboardsFile();       // tastiere.xml
     juce::File stationsFile();        // postazioni.xml
+    juce::File libraryFile();         // libreria.xml
 }

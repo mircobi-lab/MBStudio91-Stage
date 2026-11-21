@@ -69,6 +69,7 @@ target_sources(MBStudio91Stage PRIVATE
     Source/Main.cpp
     Source/ui/MainComponent.cpp
     Source/ui/StationPanel.cpp
+    Source/ui/PatchPanel.cpp
     Source/ui/StageLookAndFeel.cpp
     ${STAGE_CORE_SOURCES})
 
