@@ -24,6 +24,7 @@ set(STAGE_CORE_SOURCES
     Source/engine/StageEngine.cpp
     Source/engine/NoteProcessor.cpp
     Source/engine/KeyboardRouter.cpp
+    Source/engine/TempoTracker.cpp
     Source/patches/Patch.cpp
     Source/patches/PatchManager.cpp
     Source/control/LaunchpadMapping.cpp

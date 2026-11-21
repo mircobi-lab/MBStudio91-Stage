@@ -6,6 +6,7 @@
 #include "Station.h"
 #include "NoteProcessor.h"
 #include "KeyboardRouter.h"
+#include "TempoTracker.h"
 #include <functional>
 
 // Motore audio: 4 postazioni mescolate su un'uscita stereo, MIDI dalle tastiere, PANIC.
@@ -47,6 +48,10 @@ public:
     // Una tastiera assegnata e' sparita: la sua postazione rilascia note e pedale.
     void deviceDisconnected (const juce::String& deviceId);
 
+    TempoTracker& tempo();
+    void setClockSourceDevice (const juce::String& deviceId);   // "" = nessuno
+    juce::String getClockSourceDevice() const;
+
     void loadKeyboardSettings();        // tastiere.xml + postazioni.xml
     void saveKeyboardSettings() const;
 
@@ -73,6 +78,10 @@ private:
     void saveDeviceState();
 
     juce::AudioDeviceManager devices;
+    TempoTracker tempoTracker;
+    StagePlayHead playHead { tempoTracker };
+    mutable juce::CriticalSection clockSourceLock;
+    juce::String clockSource;
     std::array<Station, numStations> stations;
     std::array<juce::MidiMessageCollector, numStations> collectors;
     std::array<NoteProcessor, numStations> processors;
@@ -85,6 +94,9 @@ private:
     std::array<juce::MidiBuffer, numStations> injected, stationMidi;
 
     juce::SmoothedValue<float> masterGain;
+    // Limitatore di sicurezza: trasparente sotto -1 dB, attacco istantaneo, rilascio 100 ms.
+    float limiterEnvelope = 0.0f, limiterRelease = 0.0f;
+    static constexpr float limiterThreshold = 0.891251f;   // -1 dBFS
     std::atomic<float> masterTarget { 1.0f };
     std::atomic<double> currentSampleRate { 48000.0 };
     std::atomic<int> currentBlockSize { 512 };

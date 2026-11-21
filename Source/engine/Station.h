@@ -25,6 +25,7 @@ public:
     ~Station();
 
     void prepare (double sampleRate, int maxBlockSize);
+    void setPlayHead (juce::AudioPlayHead*);   // dato a ogni plugin caricato
 
     void setInstrument (std::unique_ptr<juce::AudioPluginInstance>);        // nullptr = svuota
     bool setEffect (int slot0to2, std::unique_ptr<juce::AudioPluginInstance>);
@@ -98,6 +99,7 @@ private:
 
     double sampleRate = 44100.0;
     int blockSize = 512;
+    juce::AudioPlayHead* playHead = nullptr;
 
     mutable juce::CriticalSection errorLock;
     juce::String loadError;

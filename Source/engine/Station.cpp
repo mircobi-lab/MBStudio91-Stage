@@ -22,8 +22,14 @@ Station::~Station()
 }
 
 //==============================================================================
+void Station::setPlayHead (juce::AudioPlayHead* ph)
+{
+    playHead = ph;
+}
+
 void Station::prepareInstance (juce::AudioPluginInstance& p) const
 {
+    p.setPlayHead (playHead);
     p.enableAllBuses();
     p.setRateAndBufferSizeDetails (sampleRate, blockSize);
     p.prepareToPlay (sampleRate, blockSize);
