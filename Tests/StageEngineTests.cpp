@@ -15,12 +15,34 @@ public:
         return b;
     }
 
+    // Inietta `midi` nella postazione 1 (indice 0) e rende `blocks` blocchi.
     static float render (StageEngine& e, const juce::MidiBuffer& midi, int blocks = 1)
+    {
+        if (! midi.isEmpty())
+            e.injectMidiForTest (0, midi);
+        return renderOnly (e, blocks);
+    }
+
+    static float renderOnly (StageEngine& e, int blocks = 1)
     {
         juce::AudioBuffer<float> out (2, blockSize);
         for (int i = 0; i < blocks; ++i)
-            e.renderBlock (out, i == 0 ? midi : juce::MidiBuffer {});
+            e.renderBlock (out);
         return out.getSample (1, blockSize - 1);
+    }
+
+    static juce::MidiMessage now (juce::MidiMessage m)
+    {
+        m.setTimeStamp (juce::Time::getMillisecondCounterHiRes() * 0.001);
+        return m;
+    }
+
+    static FakeInstrument* fakeOn (StageEngine& e, int station)
+    {
+        auto f = std::make_unique<FakeInstrument>();
+        auto* p = f.get();
+        e.station (station).setInstrument (std::move (f));
+        return p;
     }
 
     static StageEngine& withTwoFakes (StageEngine& e)
@@ -33,12 +55,94 @@ public:
 
     void runTest() override
     {
-        beginTest ("il MIDI delle tastiere va alla postazione 1");
+        beginTest ("una tastiera assegnata suona solo la sua postazione");
         {
             StageEngine e;
-            withTwoFakes (e);
+            e.prepare (48000.0, blockSize);
             expectEquals (StageEngine::numStations, 4);
-            expectWithinAbsoluteError (render (e, noteOn()), 0.5f, 1.0e-4f);
+            auto* f0 = fakeOn (e, 0);
+            auto* f2 = fakeOn (e, 2);
+            e.keyboards().assign (2, "lk-mini2", "Launchkey Mini MK2");
+            e.routeIncoming ("lk-mini2", "Launchkey Mini MK2", now (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100)));
+            expectWithinAbsoluteError (renderOnly (e), 0.5f, 1.0e-4f);
+            expect (f2->notes.count (60) == 1);
+            expect (f0->notes.empty());
+            expect (e.lastActivityMs (2) > 0);
+        }
+
+        beginTest ("un dispositivo non assegnato non suona nulla");
+        {
+            StageEngine e;
+            e.prepare (48000.0, blockSize);
+            fakeOn (e, 0);
+            e.routeIncoming ("ignoto", "Launchkey 61 DAW", now (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100)));
+            expectWithinAbsoluteError (renderOnly (e), 0.0f, 1.0e-6f);
+        }
+
+        beginTest ("la zona della postazione trasforma le note");
+        {
+            StageEngine e;
+            e.prepare (48000.0, blockSize);
+            auto* f = fakeOn (e, 0);
+            KeyZone z; z.transpose = 12;
+            e.setZone (0, z);
+            expect (e.getZone (0) == z);
+            e.keyboards().assign (0, "ks88", "Keystation 88 MK3");
+            e.routeIncoming ("ks88", "Keystation 88 MK3", now (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100)));
+            renderOnly (e);
+            expect (f->notes.count (72) == 1);
+        }
+
+        beginTest ("il fader della Keystation regola il volume della postazione 1");
+        {
+            StageEngine e;
+            e.prepare (48000.0, blockSize);
+            auto* f = fakeOn (e, 0);
+            expect (e.getZone (0).faderControlsVolume);
+            expect (! e.getZone (1).faderControlsVolume);
+            e.keyboards().assign (0, "ks88", "Keystation 88 MK3");
+            e.routeIncoming ("ks88", "Keystation 88 MK3", now (juce::MidiMessage::controllerEvent (1, 7, 64)));
+            renderOnly (e);
+            expectWithinAbsoluteError (e.station (0).getGainDb(), -11.9f, 0.1f);
+            expect (! f->receivedController (7));
+        }
+
+        beginTest ("apprendimento: il primo tasto assegna la tastiera e non suona");
+        {
+            StageEngine e;
+            e.prepare (48000.0, blockSize);
+            auto* f = fakeOn (e, 3);
+            int finished = -1;
+            e.onLearnFinished = [&finished] (int s) { finished = s; };
+            e.keyboards().startLearn (3);
+            e.routeIncoming ("dev-x", "Launchkey Mini", now (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100)));
+            expectEquals (e.keyboards().stationFor ("dev-x"), 3);
+            renderOnly (e);
+            expect (f->notes.empty());
+            juce::MessageManager::getInstance()->runDispatchLoopUntil (50);
+            expectEquals (finished, 3);
+        }
+
+        beginTest ("PANIC dopo un cambio di trasposizione con nota tenuta");
+        {
+            StageEngine e;
+            e.prepare (48000.0, blockSize);
+            auto* f = fakeOn (e, 0);
+            e.keyboards().assign (0, "ks88", "Keystation 88 MK3");
+            KeyZone z; z.transpose = 7;
+            e.setZone (0, z);
+            e.routeIncoming ("ks88", "Keystation 88 MK3", now (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100)));
+            renderOnly (e);
+            z.transpose = -5;
+            e.setZone (0, z);
+            e.panicAll();
+            renderOnly (e);
+            expect (f->notes.empty());
+            expectWithinAbsoluteError (renderOnly (e), 0.0f, 1.0e-6f);
+            // dopo il panic il note-off del tasto non deve produrre note fantasma
+            e.routeIncoming ("ks88", "Keystation 88 MK3", now (juce::MidiMessage::noteOff (1, 60)));
+            renderOnly (e);
+            expect (! f->receivedNoteOff (55));
         }
 
         beginTest ("le postazioni si sommano");
@@ -56,7 +160,7 @@ public:
             juce::AudioBuffer<float> out (2, blockSize);
             for (int ch = 0; ch < 2; ++ch)
                 juce::FloatVectorOperations::fill (out.getWritePointer (ch), 0.7f, blockSize);
-            e.renderBlock (out, {});
+            e.renderBlock (out);
             expectWithinAbsoluteError (out.getMagnitude (0, blockSize), 0.0f, 1.0e-6f);
         }
 

@@ -139,6 +139,7 @@ juce::String Station::getLoadError() const
 }
 
 void Station::setGainDb (float db) { targetGain = juce::Decibels::decibelsToGain (db); }
+float Station::getGainDb() const    { return juce::Decibels::gainToDecibels (targetGain.load(), -60.0f); }
 void Station::setMuted (bool m)    { muted = m; }
 bool Station::isMuted() const      { return muted; }
 void Station::requestPanic()

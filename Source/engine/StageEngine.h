@@ -4,6 +4,9 @@
 #include <array>
 #include <atomic>
 #include "Station.h"
+#include "NoteProcessor.h"
+#include "KeyboardRouter.h"
+#include <functional>
 
 // Motore audio: 4 postazioni mescolate su un'uscita stereo, MIDI dalle tastiere, PANIC.
 class StageEngine : private juce::AudioIODeviceCallback,
@@ -29,8 +32,22 @@ public:
 
     // Usati dal callback audio e dai test.
     void prepare (double sampleRate, int blockSize);
-    void renderBlock (juce::AudioBuffer<float>& out, const juce::MidiBuffer& midiForStation0);
+    void renderBlock (juce::AudioBuffer<float>& out);
     void injectMidiForTest (int station0to3, const juce::MidiBuffer&);   // consumato al prossimo renderBlock
+
+    // MIDI in arrivo da un dispositivo: apprendimento, poi la postazione assegnata (o nulla).
+    void routeIncoming (const juce::String& deviceId, const juce::String& deviceName, const juce::MidiMessage&);
+
+    KeyboardRouter& keyboards();
+    void setZone (int station0to3, const KeyZone&);
+    KeyZone getZone (int station0to3) const;
+    bool isStationDeviceConnected (int station0to3) const;
+    juce::uint32 lastActivityMs (int station0to3) const;
+
+    void loadKeyboardSettings();        // tastiere.xml + postazioni.xml
+    void saveKeyboardSettings() const;
+
+    std::function<void (int station)> onLearnFinished;   // chiamato sul message thread
 
     // Dispositivi riservati al controllo (Launchpad): non suonano le postazioni.
     static bool isReservedControlDevice (const juce::String& deviceName);
@@ -53,7 +70,12 @@ private:
 
     juce::AudioDeviceManager devices;
     std::array<Station, numStations> stations;
-    juce::MidiMessageCollector keyboardMidi;
+    std::array<juce::MidiMessageCollector, numStations> collectors;
+    std::array<NoteProcessor, numStations> processors;
+    std::array<std::atomic<bool>, numStations> resetProcessorPending {};
+    std::array<std::atomic<juce::uint32>, numStations> activity {};
+    std::array<juce::MidiBuffer, numStations> rawMidi;
+    KeyboardRouter router;
 
     juce::SpinLock injectLock;
     std::array<juce::MidiBuffer, numStations> injected, stationMidi;
@@ -67,5 +89,6 @@ private:
     juce::StringArray openedMidiIds;   // ingressi abilitati da noi
     bool started = false;
 
+    JUCE_DECLARE_WEAK_REFERENCEABLE (StageEngine)
     JUCE_DECLARE_NON_COPYABLE (StageEngine)
 };

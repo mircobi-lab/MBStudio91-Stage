@@ -12,6 +12,15 @@ StageEngine::StageEngine()
     masterGain.setCurrentAndTargetValue (1.0f);
     for (auto& b : stationMidi)
         b.ensureSize (2048);
+    for (auto& b : rawMidi)
+        b.ensureSize (2048);
+    for (auto& c : collectors)
+        c.reset (currentSampleRate.load());
+
+    // La Keystation (postazione 1) usa il suo fader come volume (spec 5.3).
+    KeyZone first;
+    first.faderControlsVolume = true;
+    processors[0].setZone (first);
 }
 
 StageEngine::~StageEngine()
@@ -117,6 +126,8 @@ void StageEngine::panicAll()
 {
     for (auto& s : stations)
         s.requestPanic();
+    for (auto& r : resetProcessorPending)
+        r = true;   // le mappe delle note tenute si azzerano sul thread audio
 }
 
 void StageEngine::setMasterGainDb (float db) { masterTarget = juce::Decibels::decibelsToGain (db); }
@@ -135,7 +146,8 @@ void StageEngine::prepare (double sampleRate, int blockSize)
     for (auto& s : stations)
         s.prepare (sampleRate, blockSize);
 
-    keyboardMidi.reset (sampleRate);
+    for (auto& c : collectors)
+        c.reset (sampleRate);
 }
 
 void StageEngine::injectMidiForTest (int station0to3, const juce::MidiBuffer& midi)
@@ -144,27 +156,41 @@ void StageEngine::injectMidiForTest (int station0to3, const juce::MidiBuffer& mi
     injected[(size_t) juce::jlimit (0, numStations - 1, station0to3)].addEvents (midi, 0, -1, 0);
 }
 
-void StageEngine::renderBlock (juce::AudioBuffer<float>& out, const juce::MidiBuffer& midiForStation0)
+void StageEngine::renderBlock (juce::AudioBuffer<float>& out)
 {
     const int numSamples = out.getNumSamples();
     out.clear();
 
+    for (auto& b : rawMidi)
+        b.clear();
     for (auto& b : stationMidi)
         b.clear();
-    stationMidi[0].addEvents (midiForStation0, 0, numSamples, 0);
+
+    for (size_t i = 0; i < collectors.size(); ++i)
+        collectors[i].removeNextBlockOfMessages (rawMidi[i], numSamples);
 
     {
         const juce::SpinLock::ScopedTryLockType sl (injectLock);
         if (sl.isLocked())
             for (size_t i = 0; i < injected.size(); ++i)
             {
-                stationMidi[i].addEvents (injected[i], 0, numSamples, 0);
+                rawMidi[i].addEvents (injected[i], 0, numSamples, 0);
                 injected[i].clear();
             }
     }
 
     for (size_t i = 0; i < stations.size(); ++i)
+    {
+        if (resetProcessorPending[i].exchange (false))
+            processors[i].reset();
+
+        std::optional<float> faderDb;
+        processors[i].process (rawMidi[i], stationMidi[i], faderDb);
+        if (faderDb.has_value())
+            stations[i].setGainDb (*faderDb);
+
         stations[i].renderAdd (out, stationMidi[i]);
+    }
 
     masterGain.setTargetValue (masterTarget.load());
     if (masterGain.isSmoothing())
@@ -187,9 +213,7 @@ void StageEngine::audioDeviceIOCallbackWithContext (const float* const*, int,
                                                     int numSamples, const juce::AudioIODeviceCallbackContext&)
 {
     juce::AudioBuffer<float> out (outputChannelData, numOutputChannels, numSamples);
-    juce::MidiBuffer keys;
-    keyboardMidi.removeNextBlockOfMessages (keys, numSamples);
-    renderBlock (out, keys);
+    renderBlock (out);
 }
 
 void StageEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
@@ -199,7 +223,93 @@ void StageEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
 
 void StageEngine::audioDeviceStopped() {}
 
-void StageEngine::handleIncomingMidiMessage (juce::MidiInput*, const juce::MidiMessage& m)
+void StageEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce::MidiMessage& m)
 {
-    keyboardMidi.addMessageToQueue (m);
+    if (source != nullptr)
+        routeIncoming (source->getIdentifier(), source->getName(), m);
+}
+
+void StageEngine::routeIncoming (const juce::String& deviceId, const juce::String& deviceName, const juce::MidiMessage& m)
+{
+    const int learned = router.handleLearn (deviceId, deviceName, m);
+    if (learned >= 0)
+    {
+        juce::MessageManager::callAsync ([safe = juce::WeakReference<StageEngine> (this), learned]
+        {
+            if (auto* self = safe.get())
+            {
+                self->saveKeyboardSettings();
+                if (self->onLearnFinished)
+                    self->onLearnFinished (learned);
+            }
+        });
+        return;   // il tasto premuto per assegnare non suona
+    }
+
+    const int station = router.stationFor (deviceId);
+    if (station < 0)
+        return;   // porte non assegnate (DAW, InControl, tastiere non usate)
+
+    activity[(size_t) station] = juce::jmax ((juce::uint32) 1, juce::Time::getMillisecondCounter());
+    collectors[(size_t) station].addMessageToQueue (m);
+}
+
+KeyboardRouter& StageEngine::keyboards() { return router; }
+
+void StageEngine::setZone (int station, const KeyZone& z)
+{
+    processors[(size_t) juce::jlimit (0, numStations - 1, station)].setZone (z);
+}
+
+KeyZone StageEngine::getZone (int station) const
+{
+    return processors[(size_t) juce::jlimit (0, numStations - 1, station)].getZone();
+}
+
+bool StageEngine::isStationDeviceConnected (int station) const
+{
+    const auto a = router.assignmentFor (station);
+    return a.has_value() && openedMidiIds.contains (a->deviceId);
+}
+
+juce::uint32 StageEngine::lastActivityMs (int station) const
+{
+    return activity[(size_t) juce::jlimit (0, numStations - 1, station)].load();
+}
+
+void StageEngine::loadKeyboardSettings()
+{
+    if (auto xml = juce::parseXML (AppPaths::keyboardsFile()))
+    {
+        router.fromXml (*xml);
+    }
+    else
+    {
+        // Primo avvio: Keystation e Launchkey 61 si riconoscono dal nome; le Mini si assegnano con ASSEGNA.
+        for (const auto& d : juce::MidiInput::getAvailableDevices())
+        {
+            const int s = KeyboardRouter::suggestStationForDeviceName (d.name);
+            if (s >= 0 && ! router.assignmentFor (s).has_value())
+                router.assign (s, d.identifier, d.name);
+        }
+    }
+
+    if (auto xml = juce::parseXML (AppPaths::stationsFile()))
+    {
+        const auto tree = juce::ValueTree::fromXml (*xml);
+        for (int i = 0; i < numStations && i < tree.getNumChildren(); ++i)
+            processors[(size_t) i].setZone (KeyZone::fromValueTree (tree.getChild (i)));
+    }
+}
+
+void StageEngine::saveKeyboardSettings() const
+{
+    if (auto xml = router.toXml())
+        xml->writeTo (AppPaths::keyboardsFile());
+
+    juce::ValueTree tree ("POSTAZIONI");
+    for (const auto& p : processors)
+        tree.appendChild (p.getZone().toValueTree(), nullptr);
+    if (auto xml = tree.createXml())
+        xml->writeTo (AppPaths::stationsFile());
 }

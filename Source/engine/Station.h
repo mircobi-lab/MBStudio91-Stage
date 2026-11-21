@@ -28,6 +28,7 @@ public:
     juce::String getLoadError() const;
 
     void setGainDb (float);
+    float getGainDb() const;
     void setMuted (bool);
     bool isMuted() const;
 
