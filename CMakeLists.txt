@@ -21,6 +21,8 @@ set(STAGE_CORE_SOURCES
     Source/engine/NoteTracker.cpp
     Source/engine/MidiPanic.cpp
     Source/engine/Station.cpp
+    Source/plugins/PluginCatalog.cpp
+    Source/plugins/ScannerProcess.cpp
 )
 
 set(STAGE_DEFINITIONS
@@ -73,7 +75,7 @@ target_sources(StageTests PRIVATE
     ${STAGE_CORE_SOURCES})
 
 target_include_directories(StageTests PRIVATE Source Tests)
-target_compile_definitions(StageTests PRIVATE ${STAGE_DEFINITIONS})
+target_compile_definitions(StageTests PRIVATE ${STAGE_DEFINITIONS} JUCE_MODAL_LOOPS_PERMITTED=1)
 target_link_libraries(StageTests PRIVATE
     ${STAGE_MODULES}
     juce::juce_recommended_config_flags
