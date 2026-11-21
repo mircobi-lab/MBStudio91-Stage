@@ -2,7 +2,7 @@
 
 Host per strumenti virtuali in stile MainStage, pensato per suonare i plugin MBStudio91, Sylenth1 e DUNE 2 in studio e in sala prove con quattro tastiere e una Launchpad.
 
-Il progetto è descritto in `docs/superpowers/specs/2026-11-21-mbstudio91-stage-design.md`. Lo sviluppo procede a fasi: sono pronte la **Fase 1 (motore)** e la **Fase 2 (tastiere)**.
+Il progetto è descritto in `docs/superpowers/specs/2026-11-21-mbstudio91-stage-design.md`. Lo sviluppo procede a fasi: sono pronte la **Fase 1 (motore)**, la **Fase 2 (tastiere)** e la **Fase 3 (patch, Launchpad, tempo)**.
 
 ## Cosa fa la Fase 1
 
@@ -22,7 +22,16 @@ Il progetto è descritto in `docs/superpowers/specs/2026-11-21-mbstudio91-stage-
 - Il fader della Keystation regola il volume della postazione 1 (FADER VOL, attivabile anche sulle altre).
 - Le porte DAW e InControl delle Launchkey e la Launchpad non suonano nulla.
 
-Le patch, la Launchpad e il tempo arrivano nella Fase 3.
+## Cosa aggiunge la Fase 3
+
+- Libreria di 8 banchi (A–H) da 64 patch. Una patch ricorda per ogni postazione strumento, effetti con le loro impostazioni, volume, mute, trasposizione, estensione e curva.
+- Pannello PATCH a destra: clic su un pad = richiamo; Maiusc + clic = solo selezione. SALVA, RINOMINA, COPIA, INCOLLA, CANCELLA. L'asterisco accanto al nome indica una patch modificata e non ancora salvata.
+- Cambio patch senza buchi: le note tenute e il pedale restano sul suono di prima, le note nuove vanno al suono nuovo; il suono vecchio finisce la sua coda (3 secondi) e sfuma.
+- Launchpad Mini MK1: griglia = patch del banco, tasti tondi in alto = banchi, a destra mute 1–4, precedente, successiva, TAP e PANIC (tenuto mezzo secondo).
+- Tempo globale: INT (BPM a mano o TAP) oppure EXT (MIDI clock da un ingresso scelto in CLOCK DA). Arpeggiatori e delay a tempo dei plugin lo seguono.
+- Limitatore di sicurezza sull'uscita a −1 dB.
+
+Il prossimo passo è il supporto di Ableton Push 2 (pad colorati, pulsanti, manopole e schermo).
 
 ## Scaricare l'app
 
@@ -56,7 +65,8 @@ Tutto in `~/Music/MBStudio91 Stage/`:
 | `macchina.settings` | scheda audio, frequenza e buffer |
 | `scan-in-corso.txt` | file temporaneo della scansione |
 | `tastiere.xml` | quale tastiera suona quale postazione |
-| `postazioni.xml` | trasposizione, estensione e curva di ogni postazione |
+| `postazioni.xml` | impostazioni correnti delle postazioni e del tempo |
+| `libreria.xml` | le patch; ogni giorno una copia `libreria-AAAA-MM-GG.xml` |
 
 Per rifare la ricerca da zero basta premere SCANSIONA PLUGIN. Per azzerare tutto, chiudi l'app e cancella `plugins.xml`.
 
