@@ -4,7 +4,7 @@ class StageApplication final : public juce::JUCEApplication
 {
 public:
     const juce::String getApplicationName() override    { return "MBStudio91 Stage"; }
-    const juce::String getApplicationVersion() override { return JUCE_APPLICATION_VERSION_STRING; }
+    const juce::String getApplicationVersion() override { return STAGE_VERSION; }
     bool moreThanOneInstanceAllowed() override          { return false; }
 
     void initialise (const juce::String&) override
