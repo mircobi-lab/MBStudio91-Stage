@@ -33,8 +33,11 @@ public:
     void setCurrentProgram (int) override {}
     const juce::String getProgramName (int) override { return {}; }
     void changeProgramName (int, const juce::String&) override {}
-    void getStateInformation (juce::MemoryBlock&) override {}
-    void setStateInformation (const void*, int) override {}
+    void getStateInformation (juce::MemoryBlock& mb) override { mb.replaceAll (stateText.toRawUTF8(), stateText.getNumBytesAsUTF8()); }
+    void setStateInformation (const void* d, int n) override { stateText = juce::String::fromUTF8 ((const char*) d, n); ++setStateCount; }
+
+    juce::String stateText;
+    int setStateCount = 0;
 
     using juce::AudioPluginInstance::processBlock;
 
@@ -112,6 +115,32 @@ public:
 
     using FakePluginBase::processBlock;
     bool active = false;
+};
+
+// Strumento che "risuona": dopo il primo note-on scrive 0.5 per sempre, finche' non riceve CC120/CC123.
+class RingingInstrument final : public FakePluginBase
+{
+public:
+    RingingInstrument() : FakePluginBase (true) {}
+    const juce::String getName() const override { return "RingingInstrument"; }
+
+    void processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) override
+    {
+        for (const auto meta : midi)
+        {
+            const auto m = meta.getMessage();
+            if (m.isNoteOn())                                 { ringing = true; ++noteOns; }
+            else if (m.isAllSoundOff() || m.isAllNotesOff())  ringing = false;
+        }
+        buffer.clear();
+        if (ringing)
+            for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+                juce::FloatVectorOperations::fill (buffer.getWritePointer (ch), 0.5f, buffer.getNumSamples());
+    }
+
+    using FakePluginBase::processBlock;
+    bool ringing = false;
+    int noteOns = 0;
 };
 
 // Effetto finto: moltiplica il segnale per un fattore.

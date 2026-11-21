@@ -13,6 +13,13 @@ class Station
 {
 public:
     static constexpr int maxEffects = 3;
+    static constexpr double tailSeconds = 3.0;   // coda della catena precedente dopo un cambio patch
+
+    struct Chain
+    {
+        std::unique_ptr<juce::AudioPluginInstance> instrument;
+        std::array<std::unique_ptr<juce::AudioPluginInstance>, maxEffects> effects;
+    };
 
     Station();
     ~Station();
@@ -23,6 +30,13 @@ public:
     bool setEffect (int slot0to2, std::unique_ptr<juce::AudioPluginInstance>);
     juce::AudioPluginInstance* getInstrument() const;
     juce::AudioPluginInstance* getEffect (int slot) const;
+
+    // Message thread. La catena attiva diventa coda (note tenute e pedale restano li'),
+    // `chain` diventa attiva. Una coda gia' presente sfuma in 20 ms.
+    void setChain (Chain);
+    // Message thread: istanze delle code terminate (onBeforeInstanceRemoved gia' chiamato).
+    std::vector<std::unique_ptr<juce::AudioPluginInstance>> takeFinishedInstances();
+    bool hasTailChain() const;
 
     void setLoadError (juce::String);
     juce::String getLoadError() const;
@@ -45,18 +59,38 @@ public:
 private:
     using InstancePtr = std::unique_ptr<juce::AudioPluginInstance>;
 
+    enum class TailState { none, held, fading, finished };
+
+    // Una catena che suona: istanze, note tenute, buffer di lavoro e (per le code) lo stato di uscita.
+    struct LiveChain
+    {
+        Chain chain;
+        NoteTracker tracker;
+        juce::MidiBuffer midi;
+        juce::AudioBuffer<float> buffer;
+        TailState state = TailState::none;
+        int samplesLeft = 0;      // coda: campioni prima di sfumare
+        float fadeGain = 1.0f, fadeStep = 0.0f;
+    };
+
+    static constexpr int maxTails = 2;
+
     void prepareInstance (juce::AudioPluginInstance&) const;
-    void retire (InstancePtr);   // message thread: avvisa, rilascia, distrugge
+    void prepareChain (LiveChain&);                 // con il lock preso
+    void retire (InstancePtr);                      // message thread: avvisa, rilascia, distrugge
+    void retireChain (Chain&);
     void resetTailsOnMessageThread();
-    int channelsNeeded() const;  // da chiamare con il lock preso
+    static int channelsNeeded (const Chain&);
+    static bool anySustain (const NoteTracker&);
+    void startFade (LiveChain&, double seconds) const;
+    void processChain (LiveChain&, int numSamples);
 
-    juce::SpinLock lock;          // protegge le istanze e lo scratch
-    InstancePtr instrument;
-    std::array<InstancePtr, maxEffects> effects;
+    juce::SpinLock lock;          // protegge catene e buffer
+    LiveChain active;
+    std::array<LiveChain, maxTails> tails;
 
-    juce::AudioBuffer<float> scratch;
-    juce::MidiBuffer midiScratch, emptyMidi;
-    NoteTracker tracker;
+    juce::MidiBuffer emptyMidi;
+    juce::AudioBuffer<float> mix;
 
     juce::SmoothedValue<float> gain;
     std::atomic<float> targetGain { 1.0f };
