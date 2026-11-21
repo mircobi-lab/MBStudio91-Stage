@@ -49,10 +49,15 @@ private:
 };
 
 // Strumento finto: scrive 0.5 su tutti i canali finche' almeno una nota e' tenuta.
+// Ha un parametro "cutoff" per provare il rilevamento delle modifiche.
 class FakeInstrument final : public FakePluginBase
 {
 public:
-    FakeInstrument() : FakePluginBase (true) {}
+    FakeInstrument() : FakePluginBase (true)
+    {
+        static_cast<juce::AudioProcessor*> (this)->addParameter (cutoff = new juce::AudioParameterFloat (juce::ParameterID { "cutoff", 1 }, "Cutoff", 0.0f, 1.0f, 0.5f));
+    }
+    juce::AudioParameterFloat* cutoff = nullptr;
     const juce::String getName() const override { return "FakeInstrument"; }
 
     void processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) override

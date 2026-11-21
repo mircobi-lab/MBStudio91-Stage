@@ -25,6 +25,7 @@ set(STAGE_CORE_SOURCES
     Source/engine/NoteProcessor.cpp
     Source/engine/KeyboardRouter.cpp
     Source/patches/Patch.cpp
+    Source/patches/PatchManager.cpp
     Source/plugins/PluginCatalog.cpp
     Source/plugins/ScannerProcess.cpp
 )
