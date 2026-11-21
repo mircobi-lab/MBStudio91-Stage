@@ -21,6 +21,7 @@ set(STAGE_CORE_SOURCES
     Source/engine/NoteTracker.cpp
     Source/engine/MidiPanic.cpp
     Source/engine/Station.cpp
+    Source/engine/StageEngine.cpp
     Source/plugins/PluginCatalog.cpp
     Source/plugins/ScannerProcess.cpp
 )
@@ -54,13 +55,18 @@ juce_add_gui_app(MBStudio91Stage
     NEEDS_CURL FALSE
     NEEDS_WEB_BROWSER FALSE)
 
+juce_add_binary_data(StageAssets SOURCES Assets/Fonts/BebasNeue-Regular.ttf)
+
 target_sources(MBStudio91Stage PRIVATE
     Source/Main.cpp
+    Source/ui/MainComponent.cpp
+    Source/ui/StageLookAndFeel.cpp
     ${STAGE_CORE_SOURCES})
 
 target_include_directories(MBStudio91Stage PRIVATE Source)
 target_compile_definitions(MBStudio91Stage PRIVATE ${STAGE_DEFINITIONS})
 target_link_libraries(MBStudio91Stage PRIVATE
+    StageAssets
     ${STAGE_MODULES}
     juce::juce_recommended_config_flags
     juce::juce_recommended_lto_flags
