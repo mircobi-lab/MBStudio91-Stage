@@ -79,6 +79,19 @@ public:
             expectWithinAbsoluteError (render (e, {}), 0.0f, 1.0e-6f);
         }
 
+        beginTest ("ingressi MIDI: chi sparisce si chiude, chi c'e' si apre");
+        {
+            const juce::StringArray enabled { "keystation", "launchkey61", "minimk1" };
+            juce::Array<juce::MidiDeviceInfo> available;
+            available.add ({ "Keystation 88 MK3", "keystation" });
+            available.add ({ "Launchkey Mini MK2", "minimk2" });
+            available.add ({ "Launchpad Mini", "launchpad" });
+
+            const auto changes = StageEngine::planMidiInputChanges (enabled, available);
+            expect (changes.toDisable == juce::StringArray { "launchkey61", "minimk1" });
+            expect (changes.toOpen == juce::StringArray { "keystation", "minimk2" });
+        }
+
         beginTest ("i dispositivi Launchpad non suonano le postazioni");
         {
             expect (StageEngine::isReservedControlDevice ("Launchpad Mini"));

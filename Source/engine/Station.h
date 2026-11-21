@@ -31,7 +31,9 @@ public:
     void setMuted (bool);
     bool isMuted() const;
 
-    void requestPanic();   // thread-safe, eseguito al prossimo blocco audio
+    // Thread-safe. Il MIDI di panic parte al prossimo blocco audio; le code (riverberi, delay)
+    // vengono azzerate subito dopo sul message thread, mai sul thread audio.
+    void requestPanic();
 
     // Chiamato sul message thread prima che un'istanza venga rimossa (per chiudere il suo editor).
     std::function<void (juce::AudioPluginInstance&)> onBeforeInstanceRemoved;
@@ -44,6 +46,7 @@ private:
 
     void prepareInstance (juce::AudioPluginInstance&) const;
     void retire (InstancePtr);   // message thread: avvisa, rilascia, distrugge
+    void resetTailsOnMessageThread();
     int channelsNeeded() const;  // da chiamare con il lock preso
 
     juce::SpinLock lock;          // protegge le istanze e lo scratch
@@ -64,5 +67,6 @@ private:
     mutable juce::CriticalSection errorLock;
     juce::String loadError;
 
+    JUCE_DECLARE_WEAK_REFERENCEABLE (Station)
     JUCE_DECLARE_NON_COPYABLE (Station)
 };

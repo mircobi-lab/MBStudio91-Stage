@@ -48,6 +48,7 @@ private:
     std::map<juce::AudioPluginInstance*, std::unique_ptr<EditorWindow>> editors;
 
     juce::String scanMessage;
+    juce::Component::SafePointer<juce::DialogWindow> audioSettingsWindow;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
 };

@@ -120,6 +120,35 @@ public:
             expectWithinAbsoluteError (run (s, noteOn()), 0.5f, 1.0e-4f);
         }
 
+        beginTest ("cambio di frequenza con un plugin che salta prepareToPlay se gia' attivo (VST3)");
+        {
+            Station s;
+            s.prepare (44100.0, 512);
+            auto fake = std::make_unique<EarlyReturnInstrument>();
+            auto* f = fake.get();
+            s.setInstrument (std::move (fake));
+            expectEquals (f->lastSampleRate, 44100.0);
+            s.prepare (48000.0, blockSize);
+            expectEquals (f->lastSampleRate, 48000.0);
+        }
+
+        beginTest ("il panic non chiama reset() sul thread audio, ma azzera le code dopo");
+        {
+            Station s;
+            s.prepare (48000.0, blockSize);
+            auto fake = std::make_unique<FakeInstrument>();
+            auto* f = fake.get();
+            s.setInstrument (std::move (fake));
+            run (s, noteOn());
+            const int preparesBefore = f->prepareCount;
+            s.requestPanic();
+            run (s, {});
+            expectEquals (f->resetCount, 0);
+            juce::MessageManager::getInstance()->runDispatchLoopUntil (100);
+            expect (f->prepareCount > preparesBefore, "le code degli effetti vanno azzerate dal message thread");
+            expectWithinAbsoluteError (run (s, {}), 0.0f, 1.0e-6f);
+        }
+
         beginTest ("sostituire lo strumento avvisa prima di rimuovere il vecchio");
         {
             Station s;

@@ -89,6 +89,31 @@ public:
     int resetCount = 0;
 };
 
+// Come il wrapper VST3 di JUCE: prepareToPlay non fa nulla se e' gia' attivo
+// con la stessa frequenza e lo stesso blocco gia' impostati con setRateAndBufferSizeDetails.
+class EarlyReturnInstrument final : public FakePluginBase
+{
+public:
+    EarlyReturnInstrument() : FakePluginBase (true) {}
+    const juce::String getName() const override { return "EarlyReturnInstrument"; }
+
+    void prepareToPlay (double sr, int bs) override
+    {
+        if (active && juce::approximatelyEqual (getSampleRate(), sr) && getBlockSize() == bs)
+            return;
+        active = true;
+        lastSampleRate = sr;
+        ++prepareCount;
+    }
+
+    void releaseResources() override { active = false; }
+
+    void processBlock (juce::AudioBuffer<float>& b, juce::MidiBuffer&) override { b.clear(); }
+
+    using FakePluginBase::processBlock;
+    bool active = false;
+};
+
 // Effetto finto: moltiplica il segnale per un fattore.
 class FakeGainEffect final : public FakePluginBase
 {

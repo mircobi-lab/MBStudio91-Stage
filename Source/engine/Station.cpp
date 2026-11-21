@@ -51,11 +51,19 @@ void Station::prepare (double newSampleRate, int maxBlockSize)
     gain.reset (sampleRate, gainRampSeconds);
     gain.setCurrentAndTargetValue (current);
 
+    // releaseResources prima di preparare: il wrapper VST3 di JUCE ignora prepareToPlay
+    // se il plugin e' gia' attivo con i valori appena impostati.
     if (instrument != nullptr)
+    {
+        instrument->releaseResources();
         prepareInstance (*instrument);
+    }
     for (auto& fx : effects)
         if (fx != nullptr)
+        {
+            fx->releaseResources();
             prepareInstance (*fx);
+        }
 
     scratch.setSize (channelsNeeded(), blockSize, false, true, false);
     midiScratch.ensureSize (2048);
@@ -133,7 +141,33 @@ juce::String Station::getLoadError() const
 void Station::setGainDb (float db) { targetGain = juce::Decibels::decibelsToGain (db); }
 void Station::setMuted (bool m)    { muted = m; }
 bool Station::isMuted() const      { return muted; }
-void Station::requestPanic()       { panicPending = true; }
+void Station::requestPanic()
+{
+    panicPending = true;
+
+    juce::MessageManager::callAsync ([safe = juce::WeakReference<Station> (this)]
+    {
+        if (auto* self = safe.get())
+            self->resetTailsOnMessageThread();
+    });
+}
+
+void Station::resetTailsOnMessageThread()
+{
+    // Con il lock preso il thread audio salta i blocchi: silenzio mentre i plugin ripartono.
+    const juce::SpinLock::ScopedLockType sl (lock);
+    if (instrument != nullptr)
+    {
+        instrument->releaseResources();
+        prepareInstance (*instrument);
+    }
+    for (auto& fx : effects)
+        if (fx != nullptr)
+        {
+            fx->releaseResources();
+            prepareInstance (*fx);
+        }
+}
 
 void Station::renderAdd (juce::AudioBuffer<float>& out, const juce::MidiBuffer& midiIn)
 {
@@ -160,13 +194,7 @@ void Station::renderAdd (juce::AudioBuffer<float>& out, const juce::MidiBuffer& 
 
     const bool doPanic = panicPending.exchange (false);
     if (doPanic)
-    {
         midiScratch.addEvents (MidiPanic::makePanicBuffer (tracker, 0), 0, -1, 0);
-        instrument->reset();
-        for (auto& fx : effects)
-            if (fx != nullptr)
-                fx->reset();
-    }
 
     tracker.process (midiScratch);
 

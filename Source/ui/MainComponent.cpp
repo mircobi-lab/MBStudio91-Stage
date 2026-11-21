@@ -93,6 +93,9 @@ MainComponent::MainComponent (StageEngine& e, PluginCatalog& c)
 MainComponent::~MainComponent()
 {
     stopTimer();
+    // Il dialog va chiuso prima che il motore (e il suo AudioDeviceManager) venga distrutto.
+    if (auto* w = audioSettingsWindow.getComponent())
+        delete w;
     editors.clear();
     station.onBeforeInstanceRemoved = nullptr;
 }
@@ -250,6 +253,12 @@ void MainComponent::closeEditorFor (juce::AudioPluginInstance& p)
 
 void MainComponent::showAudioSettings()
 {
+    if (auto* w = audioSettingsWindow.getComponent())
+    {
+        w->toFront (true);
+        return;
+    }
+
     auto* selector = new juce::AudioDeviceSelectorComponent (engine.deviceManager(), 0, 0, 2, 2,
                                                              false, false, true, false);
     selector->setSize (520, 360);
@@ -260,7 +269,7 @@ void MainComponent::showAudioSettings()
     o.dialogBackgroundColour = juce::Colours::black;
     o.useNativeTitleBar = true;
     o.resizable = false;
-    o.launchAsync();
+    audioSettingsWindow = o.launchAsync();
 }
 
 void MainComponent::startScan()

@@ -35,6 +35,11 @@ public:
     // Dispositivi riservati al controllo (Launchpad): non suonano le postazioni.
     static bool isReservedControlDevice (const juce::String& deviceName);
 
+    // Ingressi da chiudere (abilitati ma non piu' presenti) e da aprire (presenti, non riservati).
+    struct MidiInputChanges { juce::StringArray toDisable, toOpen; };
+    static MidiInputChanges planMidiInputChanges (const juce::StringArray& enabledIds,
+                                                  const juce::Array<juce::MidiDeviceInfo>& available);
+
 private:
     void audioDeviceIOCallbackWithContext (const float* const* inputChannelData, int numInputChannels,
                                            float* const* outputChannelData, int numOutputChannels,
@@ -59,6 +64,7 @@ private:
     std::atomic<int> currentBlockSize { 512 };
 
     juce::MidiDeviceListConnection midiDevicesChanged;
+    juce::StringArray openedMidiIds;   // ingressi abilitati da noi
     bool started = false;
 
     JUCE_DECLARE_NON_COPYABLE (StageEngine)

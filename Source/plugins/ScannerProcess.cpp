@@ -7,7 +7,13 @@
 
 namespace
 {
-    constexpr int workerTimeoutMs = 0;   // nessun timeout: alcuni plugin impiegano molto a scansionare
+    // 0 = timeout predefinito di JUCE per il ping tra i processi (i ping girano su thread propri,
+    // quindi un plugin che blocca il figlio NON viene rilevato da qui: vedi perFileDeadlineMs).
+    constexpr int workerTimeoutMs = 0;
+
+    // Tempo massimo per esaminare un singolo file. Oltre, il figlio viene chiuso
+    // e il file finisce nella lista dei plugin scartati.
+    constexpr juce::uint32 perFileDeadlineMs = 120000;
 
     //======================================================================
     // Processo figlio: riceve <formato, identificatore>, risponde con un XML <LIST> di PluginDescription.
@@ -167,10 +173,18 @@ namespace
                 return false;
             }
 
+            const auto deadline = juce::Time::getMillisecondCounter() + perFileDeadlineMs;
+
             for (;;)
             {
                 if (shouldExit())
                     return true;
+
+                if (juce::Time::getMillisecondCounter() > deadline)
+                {
+                    coordinator = nullptr;   // plugin bloccato: chiude il figlio, il file viene scartato
+                    return false;
+                }
 
                 std::unique_ptr<juce::XmlElement> xml;
                 const auto state = coordinator->waitForResult (xml);

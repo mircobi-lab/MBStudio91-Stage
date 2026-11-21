@@ -44,8 +44,9 @@ void StageEngine::stop()
     started = false;
 
     midiDevicesChanged = {};
-    for (const auto& d : juce::MidiInput::getAvailableDevices())
-        devices.removeMidiInputDeviceCallback (d.identifier, this);
+    for (const auto& id : openedMidiIds)
+        devices.removeMidiInputDeviceCallback (id, this);
+    openedMidiIds.clear();
 
     saveDeviceState();
     devices.removeAudioCallback (this);
@@ -63,18 +64,44 @@ bool StageEngine::isReservedControlDevice (const juce::String& name)
     return name.containsIgnoreCase ("Launchpad");
 }
 
+StageEngine::MidiInputChanges StageEngine::planMidiInputChanges (const juce::StringArray& enabledIds,
+                                                                const juce::Array<juce::MidiDeviceInfo>& available)
+{
+    MidiInputChanges c;
+    for (const auto& id : enabledIds)
+    {
+        bool present = false;
+        for (const auto& d : available)
+            present = present || d.identifier == id;
+        if (! present)
+            c.toDisable.add (id);
+    }
+    for (const auto& d : available)
+        if (! isReservedControlDevice (d.name))
+            c.toOpen.add (d.identifier);
+    return c;
+}
+
 void StageEngine::openAllMidiInputs()
 {
-    for (const auto& d : juce::MidiInput::getAvailableDevices())
+    const auto changes = planMidiInputChanges (openedMidiIds, juce::MidiInput::getAvailableDevices());
+
+    // Una tastiera scollegata va chiusa davvero: al ricollegamento verra' riaperta da capo.
+    for (const auto& id : changes.toDisable)
     {
-        if (isReservedControlDevice (d.name))
-            continue;
+        devices.removeMidiInputDeviceCallback (id, this);
+        devices.setMidiInputDeviceEnabled (id, false);
+        openedMidiIds.removeString (id);
+    }
 
-        if (! devices.isMidiInputDeviceEnabled (d.identifier))
-            devices.setMidiInputDeviceEnabled (d.identifier, true);
+    for (const auto& id : changes.toOpen)
+    {
+        if (! devices.isMidiInputDeviceEnabled (id))
+            devices.setMidiInputDeviceEnabled (id, true);
 
-        devices.removeMidiInputDeviceCallback (d.identifier, this);   // evita doppie registrazioni
-        devices.addMidiInputDeviceCallback (d.identifier, this);
+        devices.removeMidiInputDeviceCallback (id, this);   // evita doppie registrazioni
+        devices.addMidiInputDeviceCallback (id, this);
+        openedMidiIds.addIfNotAlreadyThere (id);
     }
 }
 
