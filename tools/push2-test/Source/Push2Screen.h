@@ -8,12 +8,19 @@
 struct TextPart
 {
     enum class Style { regular, bold, inverted };
+    enum class Face { bebas, logoLight, logoBold };
 
     juce::String text;
     Style style = Style::regular;
     juce::Colour colour = juce::Colours::white;
     float scale = 1.0f;     // per le sigle piccole tipo MK2
     float gapBefore = 0.0f; // spazio prima del pezzo, in frazioni dell'altezza
+    Face face = Face::bebas;
+};
+
+struct Faces
+{
+    juce::Typeface::Ptr bebas, logoLight, logoBold;
 };
 
 using StyledText = std::vector<TextPart>;
@@ -31,6 +38,9 @@ StyledText launchpadMiniMk1();
 // Nome del plugin: prima lettera in grassetto, il resto normale
 StyledText pluginName (const juce::String& name, juce::Colour colour);
 
+// Nome nello stile del logo MBSTUDIO91: lettere spesse, numeri sottili (come STUDIO e 91)
+StyledText logoStyleName (const juce::String& name, juce::Colour colour);
+
 struct ScreenSetup
 {
     juce::String plugin;
@@ -41,9 +51,9 @@ struct ScreenSetup
 // Disegna la schermata 960x160 del Push 2
 juce::Image renderScreen (const std::vector<ScreenSetup>& setups, int active,
                           const StyledText& setupChanger,
-                          const juce::String& firmware, juce::Typeface::Ptr typeface);
+                          const juce::String& firmware, const Faces& faces);
 
 // Disegna una scritta composta con la base del testo a "baseline"; restituisce la larghezza.
 // Con draw = false misura soltanto.
 float drawStyledText (juce::Graphics& g, const StyledText& parts, float x, float baseline,
-                      float height, juce::Typeface::Ptr typeface, bool draw = true);
+                      float height, const Faces& faces, bool draw = true);

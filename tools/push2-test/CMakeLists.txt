@@ -50,7 +50,11 @@ juce_add_gui_app(MBStudio91Push2Test
     NEEDS_WEB_BROWSER FALSE)
 
 # Il font e' quello di MBStudio91 Stage (Assets/Fonts nella radice del repository)
-juce_add_binary_data(Push2TestAssets SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../Assets/Fonts/BebasNeue-Regular.ttf)
+# Comfortaa Light/Bold (OFL, file originali di googlefonts/comfortaa) per il nome in stile logo MBStudio
+juce_add_binary_data(Push2TestAssets SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Assets/Fonts/BebasNeue-Regular.ttf
+    Assets/Fonts/Comfortaa-Light.ttf
+    Assets/Fonts/Comfortaa-Bold.ttf)
 
 target_sources(MBStudio91Push2Test PRIVATE
     Source/Main.cpp

@@ -69,6 +69,7 @@ private:
     Push2Display::State shownDisplayState = Push2Display::State::searching;
 
     juce::Typeface::Ptr bebas;
+    Faces faces;
     juce::Label title, midiStatus, displayStatus, firmwareStatus, eventLabel;
     std::array<juce::TextButton, numSetups> setupButtons;
 

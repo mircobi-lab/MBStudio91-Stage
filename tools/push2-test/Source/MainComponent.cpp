@@ -24,6 +24,9 @@ MainComponent::MainComponent()
 
     bebas = juce::Typeface::createSystemTypefaceFor (BinaryData::BebasNeueRegular_ttf,
                                                      BinaryData::BebasNeueRegular_ttfSize);
+    faces.bebas = bebas;
+    faces.logoLight = juce::Typeface::createSystemTypefaceFor (BinaryData::ComfortaaLight_ttf, BinaryData::ComfortaaLight_ttfSize);
+    faces.logoBold  = juce::Typeface::createSystemTypefaceFor (BinaryData::ComfortaaBold_ttf, BinaryData::ComfortaaBold_ttfSize);
     auto font = [this] (float h) { return juce::Font (juce::FontOptions().withTypeface (bebas).withHeight (h)); };
 
     title.setText ("MBSTUDIO91 STAGE  -  TEST PUSH 2", juce::dontSendNotification);
@@ -346,7 +349,7 @@ void MainComponent::renderDisplay()
     for (const auto& s : setups)
         list.push_back ({ s.name, deviceNames[(size_t) s.device], s.colour });
     display.setImage (renderScreen (list, activeSetup, devices::launchpadMiniMk1(),
-                                    firmware ? firmware->upToFirstOccurrenceOf (" ", false, false) : juce::String(), bebas));
+                                    firmware ? firmware->upToFirstOccurrenceOf (" ", false, false) : juce::String(), faces));
     repaint();
 }
 
