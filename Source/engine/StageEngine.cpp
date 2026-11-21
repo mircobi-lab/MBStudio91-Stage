@@ -98,6 +98,7 @@ void StageEngine::openAllMidiInputs()
     // Una tastiera scollegata va chiusa davvero: al ricollegamento verra' riaperta da capo.
     for (const auto& id : changes.toDisable)
     {
+        deviceDisconnected (id);
         devices.removeMidiInputDeviceCallback (id, this);
         devices.setMidiInputDeviceEnabled (id, false);
         openedMidiIds.removeString (id);
@@ -128,6 +129,7 @@ void StageEngine::panicAll()
         s.requestPanic();
     for (auto& r : resetProcessorPending)
         r = true;   // le mappe delle note tenute si azzerano sul thread audio
+    router.cancelLearn();
 }
 
 void StageEngine::setMasterGainDb (float db) { masterTarget = juce::Decibels::decibelsToGain (db); }
@@ -231,9 +233,20 @@ void StageEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
 
 void StageEngine::routeIncoming (const juce::String& deviceId, const juce::String& deviceName, const juce::MidiMessage& m)
 {
+    // Prima di un'eventuale riassegnazione: dove suonava questa tastiera e chi aveva la postazione.
+    const int previousStation = router.stationFor (deviceId);
+    const int learningStation = router.learningStation();
+    const auto previousOwner = learningStation >= 0 ? router.assignmentFor (learningStation) : std::nullopt;
+
     const int learned = router.handleLearn (deviceId, deviceName, m);
     if (learned >= 0)
     {
+        // Nessuna nota resta appesa sulle postazioni che cambiano tastiera.
+        if (previousStation >= 0 && previousStation != learned)
+            releaseStation (previousStation);
+        if (previousOwner.has_value() && previousOwner->deviceId != deviceId)
+            releaseStation (learned);
+
         juce::MessageManager::callAsync ([safe = juce::WeakReference<StageEngine> (this), learned]
         {
             if (auto* self = safe.get())
@@ -312,4 +325,17 @@ void StageEngine::saveKeyboardSettings() const
         tree.appendChild (p.getZone().toValueTree(), nullptr);
     if (auto xml = tree.createXml())
         xml->writeTo (AppPaths::stationsFile());
+}
+
+void StageEngine::releaseStation (int station)
+{
+    if (! juce::isPositiveAndBelow (station, numStations))
+        return;
+    stations[(size_t) station].requestPanic();          // note-off per le note che suonano, pedale su
+    resetProcessorPending[(size_t) station] = true;     // la mappa dei tasti tenuti si azzera nel blocco audio
+}
+
+void StageEngine::deviceDisconnected (const juce::String& deviceId)
+{
+    releaseStation (router.stationFor (deviceId));
 }

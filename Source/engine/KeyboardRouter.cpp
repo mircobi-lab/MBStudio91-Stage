@@ -42,10 +42,16 @@ std::optional<KeyboardRouter::Assignment> KeyboardRouter::assignmentFor (int sta
     return assignments[(size_t) station];
 }
 
+bool KeyboardRouter::learnExpired() const
+{
+    return learning >= 0 && clock() - learnStartedMs > learnTimeoutMs;
+}
+
 void KeyboardRouter::startLearn (int station)
 {
     const juce::ScopedLock sl (lock);
     learning = validStation (station) ? station : -1;
+    learnStartedMs = clock();
 }
 
 void KeyboardRouter::cancelLearn()
@@ -57,7 +63,7 @@ void KeyboardRouter::cancelLearn()
 int KeyboardRouter::learningStation() const
 {
     const juce::ScopedLock sl (lock);
-    return learning;
+    return learnExpired() ? -1 : learning;
 }
 
 int KeyboardRouter::handleLearn (const juce::String& deviceId, const juce::String& deviceName, const juce::MidiMessage& m)
@@ -65,6 +71,8 @@ int KeyboardRouter::handleLearn (const juce::String& deviceId, const juce::Strin
     int station = -1;
     {
         const juce::ScopedLock sl (lock);
+        if (learnExpired())
+            learning = -1;
         if (learning < 0 || ! m.isNoteOn())
             return -1;
         station = learning;

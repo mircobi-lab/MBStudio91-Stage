@@ -54,6 +54,20 @@ public:
             expectEquals (r.learningStation(), -1);
         }
 
+        beginTest ("l'apprendimento scade dopo 10 secondi");
+        {
+            KeyboardRouter r;
+            juce::uint32 fakeNow = 1000;
+            r.clock = [&fakeNow] { return fakeNow; };
+            r.startLearn (2);
+            fakeNow += 9000;
+            expectEquals (r.learningStation(), 2);
+            fakeNow += 2000;
+            expectEquals (r.learningStation(), -1);
+            expectEquals (r.handleLearn ("x", "X", juce::MidiMessage::noteOn (1, 60, (juce::uint8) 90)), -1);
+            expectEquals (r.stationFor ("x"), -1);
+        }
+
         beginTest ("suggerimento per nome");
         expectEquals (KeyboardRouter::suggestStationForDeviceName ("Keystation 88 MK3"), 0);
         expectEquals (KeyboardRouter::suggestStationForDeviceName ("Launchkey 61"), 1);

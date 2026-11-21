@@ -123,6 +123,47 @@ public:
             expectEquals (finished, 3);
         }
 
+        beginTest ("riassegnare una tastiera che sta suonando libera la vecchia postazione");
+        {
+            StageEngine e;
+            e.prepare (48000.0, blockSize);
+            auto* f0 = fakeOn (e, 0);
+            fakeOn (e, 2);
+            e.keyboards().assign (0, "ks88", "Keystation 88 MK3");
+            e.routeIncoming ("ks88", "Keystation 88 MK3", now (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100)));
+            e.routeIncoming ("ks88", "Keystation 88 MK3", now (juce::MidiMessage::controllerEvent (1, 64, 127)));
+            renderOnly (e);
+            expect (f0->notes.count (60) == 1);
+            e.keyboards().startLearn (2);
+            e.routeIncoming ("ks88", "Keystation 88 MK3", now (juce::MidiMessage::noteOn (1, 62, (juce::uint8) 100)));
+            renderOnly (e);
+            expect (f0->notes.empty(), "la postazione 1 non deve restare con note appese");
+        }
+
+        beginTest ("una tastiera scollegata libera la sua postazione");
+        {
+            StageEngine e;
+            e.prepare (48000.0, blockSize);
+            auto* f = fakeOn (e, 1);
+            e.keyboards().assign (1, "lk61", "Launchkey 61");
+            e.routeIncoming ("lk61", "Launchkey 61", now (juce::MidiMessage::noteOn (1, 64, (juce::uint8) 100)));
+            renderOnly (e);
+            expect (f->notes.count (64) == 1);
+            e.deviceDisconnected ("lk61");
+            renderOnly (e);
+            expect (f->notes.empty());
+            expectEquals (e.keyboards().stationFor ("lk61"), 1);   // l'assegnazione resta per quando torna
+        }
+
+        beginTest ("PANIC annulla l'apprendimento in corso");
+        {
+            StageEngine e;
+            e.prepare (48000.0, blockSize);
+            e.keyboards().startLearn (3);
+            e.panicAll();
+            expectEquals (e.keyboards().learningStation(), -1);
+        }
+
         beginTest ("PANIC dopo un cambio di trasposizione con nota tenuta");
         {
             StageEngine e;

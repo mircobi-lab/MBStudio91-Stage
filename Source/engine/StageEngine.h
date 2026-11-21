@@ -44,6 +44,9 @@ public:
     bool isStationDeviceConnected (int station0to3) const;
     juce::uint32 lastActivityMs (int station0to3) const;
 
+    // Una tastiera assegnata e' sparita: la sua postazione rilascia note e pedale.
+    void deviceDisconnected (const juce::String& deviceId);
+
     void loadKeyboardSettings();        // tastiere.xml + postazioni.xml
     void saveKeyboardSettings() const;
 
@@ -66,6 +69,7 @@ private:
     void handleIncomingMidiMessage (juce::MidiInput*, const juce::MidiMessage&) override;
 
     void openAllMidiInputs();
+    void releaseStation (int station);   // qualsiasi thread: note-off, pedale su, mappa azzerata
     void saveDeviceState();
 
     juce::AudioDeviceManager devices;

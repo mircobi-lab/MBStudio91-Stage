@@ -3,6 +3,7 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <array>
 #include <optional>
+#include <functional>
 
 // Quale tastiera (per identificativo del dispositivo MIDI) suona quale postazione.
 // Thread-safe: usato dal thread MIDI e dal message thread.
@@ -23,6 +24,9 @@ public:
     int learningStation() const;
     int handleLearn (const juce::String& deviceId, const juce::String& deviceName, const juce::MidiMessage&);
 
+    static constexpr juce::uint32 learnTimeoutMs = 10000;   // ASSEGNA si annulla da solo dopo 10 s
+    std::function<juce::uint32()> clock = [] { return juce::Time::getMillisecondCounter(); };
+
     static int suggestStationForDeviceName (const juce::String& name);
 
     std::unique_ptr<juce::XmlElement> toXml() const;
@@ -32,4 +36,6 @@ private:
     mutable juce::CriticalSection lock;
     std::array<std::optional<Assignment>, numStations> assignments;
     int learning = -1;
+    juce::uint32 learnStartedMs = 0;
+    bool learnExpired() const;   // con il lock preso
 };
