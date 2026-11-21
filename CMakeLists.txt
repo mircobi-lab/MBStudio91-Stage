@@ -22,6 +22,7 @@ set(STAGE_CORE_SOURCES
     Source/engine/MidiPanic.cpp
     Source/engine/Station.cpp
     Source/engine/StageEngine.cpp
+    Source/engine/NoteProcessor.cpp
     Source/plugins/PluginCatalog.cpp
     Source/plugins/ScannerProcess.cpp
 )
