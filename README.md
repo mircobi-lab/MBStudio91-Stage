@@ -2,7 +2,7 @@
 
 Host per strumenti virtuali in stile MainStage, pensato per suonare i plugin MBStudio91, Sylenth1 e DUNE 2 in studio e in sala prove con quattro tastiere e una Launchpad.
 
-Il progetto è descritto in `docs/superpowers/specs/2026-11-21-mbstudio91-stage-design.md`. Lo sviluppo procede a fasi; questa è la **Fase 1 (motore)**.
+Il progetto è descritto in `docs/superpowers/specs/2026-11-21-mbstudio91-stage-design.md`. Lo sviluppo procede a fasi: sono pronte la **Fase 1 (motore)** e la **Fase 2 (tastiere)**.
 
 ## Cosa fa la Fase 1
 
@@ -13,7 +13,16 @@ Il progetto è descritto in `docs/superpowers/specs/2026-11-21-mbstudio91-stage-
 - Suona da tutte le tastiere MIDI collegate (la Launchpad è esclusa: servirà per le patch dalla Fase 3).
 - PANIC ferma subito tutte le note, anche con il pedale premuto.
 
-Le postazioni 2, 3 e 4, le patch, la Launchpad e il tempo arrivano nelle fasi successive.
+## Cosa aggiunge la Fase 2
+
+- Quattro postazioni affiancate, ognuna con strumento, tre effetti, volume e mute.
+- Ogni tastiera suona la sua postazione. Keystation 88 e Launchkey 61 vengono riconosciute da sole al primo avvio; le due Launchkey Mini si assegnano con ASSEGNA e un tasto qualsiasi. Le assegnazioni restano anche dopo il riavvio.
+- Il LED della postazione è verde se la tastiera è collegata e lampeggia bianco quando arriva MIDI.
+- Per ogni postazione: trasposizione (TRASP, ±48 semitoni), estensione dei tasti (DA, A; il Do centrale è C3 come in Ableton), curva di velocity (lineare, morbida, dura, personalizzata).
+- Il fader della Keystation regola il volume della postazione 1 (FADER VOL, attivabile anche sulle altre).
+- Le porte DAW e InControl delle Launchkey e la Launchpad non suonano nulla.
+
+Le patch, la Launchpad e il tempo arrivano nella Fase 3.
 
 ## Scaricare l'app
 
@@ -46,6 +55,8 @@ Tutto in `~/Music/MBStudio91 Stage/`:
 | `plugins.xml` | elenco dei plugin trovati |
 | `macchina.settings` | scheda audio, frequenza e buffer |
 | `scan-in-corso.txt` | file temporaneo della scansione |
+| `tastiere.xml` | quale tastiera suona quale postazione |
+| `postazioni.xml` | trasposizione, estensione e curva di ogni postazione |
 
 Per rifare la ricerca da zero basta premere SCANSIONA PLUGIN. Per azzerare tutto, chiudi l'app e cancella `plugins.xml`.
 
