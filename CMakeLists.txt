@@ -18,6 +18,8 @@ FetchContent_MakeAvailable(JUCE)
 #  e poi di nuovo nell'app duplicherebbe i simboli, quindi si condivide la lista.)
 set(STAGE_CORE_SOURCES
     Source/settings/AppPaths.cpp
+    Source/engine/NoteTracker.cpp
+    Source/engine/MidiPanic.cpp
 )
 
 set(STAGE_DEFINITIONS
@@ -62,11 +64,11 @@ target_link_libraries(MBStudio91Stage PRIVATE
     juce::juce_recommended_warning_flags)
 
 # ---------------------------------------------------------------- test
+file(GLOB STAGE_TEST_SOURCES CONFIGURE_DEPENDS Tests/*.cpp)
 juce_add_console_app(StageTests PRODUCT_NAME "StageTests")
 
 target_sources(StageTests PRIVATE
-    Tests/TestMain.cpp
-    Tests/AppPathsTests.cpp
+    ${STAGE_TEST_SOURCES}
     ${STAGE_CORE_SOURCES})
 
 target_include_directories(StageTests PRIVATE Source Tests)
