@@ -25,6 +25,7 @@ public:
 
     int activeBank() const;
     int activePatch() const;
+    int activePatchBank() const;         // banco della patch attiva (activeBank e' quello mostrato)
     int loadingPatch() const;            // -1 se nessuno
     bool isLoading() const;
     bool isModified() const;
@@ -54,7 +55,7 @@ private:
 
     std::vector<std::unique_ptr<juce::AudioPluginInstance>> pool;   // il piu' vecchio in testa
     int generation = 0;
-    int bank = 0, patch = -1, loading = -1;
+    int bank = 0, patch = -1, patchBank = 0, loading = -1;
     std::atomic<bool> modified { false };
     std::atomic<bool> applying { false };
     std::shared_ptr<bool> alive = std::make_shared<bool> (true);   // per i caricamenti che finiscono dopo la chiusura

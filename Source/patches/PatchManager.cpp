@@ -61,6 +61,7 @@ void PatchManager::saveCurrentTo (int b, int index, const juce::String& name)
 {
     library.set (b, index, capture (name));
     bank = b;
+    patchBank = b;
     patch = index;
     modified = false;
     if (onStateChanged)
@@ -168,6 +169,7 @@ void PatchManager::apply (PendingRecall& req)
     }
 
     bank = req.bank;
+    patchBank = req.bank;
     patch = req.index;
     loading = -1;
     listenToActive (true);
@@ -258,3 +260,4 @@ bool PatchManager::isModified() const    { return modified; }
 void PatchManager::setActiveBank (int b) { bank = juce::jlimit (0, Library::numBanks - 1, b); if (onStateChanged) onStateChanged(); }
 void PatchManager::markModified()        { modified = true; }
 juce::StringArray PatchManager::lastErrors() const { return errors; }
+int PatchManager::activePatchBank() const { return patchBank; }

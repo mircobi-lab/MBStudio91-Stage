@@ -29,6 +29,7 @@ set(STAGE_CORE_SOURCES
     Source/patches/PatchManager.cpp
     Source/control/LaunchpadMapping.cpp
     Source/control/LaunchpadController.cpp
+    Source/control/SurfaceCoordinator.cpp
     Source/plugins/PluginCatalog.cpp
     Source/plugins/ScannerProcess.cpp
 )
