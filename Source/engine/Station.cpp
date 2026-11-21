@@ -12,6 +12,9 @@ Station::Station()
 {
     gain.reset (sampleRate, gainRampSeconds);
     gain.setCurrentAndTargetValue (1.0f);
+    deferredMidi.ensureSize (4096);
+    incoming.ensureSize (4096);
+    fadeGains.resize ((size_t) blockSize);
 }
 
 Station::~Station()
@@ -101,6 +104,7 @@ void Station::prepare (double newSampleRate, int maxBlockSize)
             prepareChain (t);
 
     mix.setSize (2, blockSize, false, true, false);
+    fadeGains.resize ((size_t) blockSize);
 }
 
 //==============================================================================
@@ -216,6 +220,8 @@ void Station::setChain (Chain newChain)
         std::swap (slot->buffer, active.buffer);
         std::swap (slot->midi, active.midi);
         slot->state = (slot->chain.instrument != nullptr) ? TailState::held : TailState::finished;
+        if (slot->state == TailState::finished)
+            tailFinished = true;
         slot->samplesLeft = (int) (tailSeconds * sampleRate);
         slot->fadeGain = 1.0f;
         slot->fadeStep = 0.0f;
@@ -234,6 +240,8 @@ void Station::setChain (Chain newChain)
 std::vector<std::unique_ptr<juce::AudioPluginInstance>> Station::takeFinishedInstances()
 {
     std::vector<InstancePtr> out;
+    if (! tailFinished.exchange (false))
+        return out;   // niente da ritirare: il thread audio non viene disturbato
     {
         const juce::SpinLock::ScopedLockType sl (lock);
         for (auto& t : tails)
@@ -341,9 +349,22 @@ void Station::renderAdd (juce::AudioBuffer<float>& out, const juce::MidiBuffer& 
 {
     const juce::SpinLock::ScopedTryLockType sl (lock);
     if (! sl.isLocked())
-        return;   // sostituzione in corso: un blocco di silenzio
+    {
+        // Sostituzione in corso: un blocco di silenzio, ma il MIDI si tiene per il blocco dopo.
+        for (const auto meta : midiIn)
+            deferredMidi.addEvent (meta.data, meta.numBytes, 0);
+        return;
+    }
 
     const int numSamples = out.getNumSamples();
+    incoming.clear();
+    if (! deferredMidi.isEmpty())
+    {
+        for (const auto meta : deferredMidi)
+            incoming.addEvent (meta.data, meta.numBytes, 0);
+        deferredMidi.clear();
+    }
+    incoming.addEvents (midiIn, 0, numSamples, 0);
     gain.setTargetValue (muted ? 0.0f : targetGain.load());
 
     // Buffer piu' grandi del blocco dichiarato: caso raro, si adeguano.
@@ -354,6 +375,8 @@ void Station::renderAdd (juce::AudioBuffer<float>& out, const juce::MidiBuffer& 
     };
     ensure (active.buffer);
     ensure (mix);
+    if ((int) fadeGains.size() < numSamples)
+        fadeGains.resize ((size_t) numSamples);   // caso raro: blocco piu' grande di quello dichiarato
     for (auto& t : tails)
         if (t.state == TailState::held || t.state == TailState::fading)
             ensure (t.buffer);
@@ -364,13 +387,20 @@ void Station::renderAdd (juce::AudioBuffer<float>& out, const juce::MidiBuffer& 
 
     auto isLive = [] (const LiveChain& t) { return t.state == TailState::held || t.state == TailState::fading; };
 
-    // Instradamento: note nuove alla catena attiva, note-off a chi tiene la nota, pedale e bend a tutte.
-    for (const auto meta : midiIn)
+    // Code "impegnate": hanno ancora note o pedale giu'. Solo loro ricevono controlli, bend e pressione.
+    auto isEngaged = [&isLive] (const LiveChain& t) { return isLive (t) && (t.tracker.heldNoteCount() > 0 || anySustain (t.tracker)); };
+    std::array<bool, maxTails> engaged {};
+    for (size_t i = 0; i < tails.size(); ++i)
+        engaged[i] = isEngaged (tails[i]);
+
+    // Instradamento: note nuove alla catena attiva, note-off e aftertouch a chi tiene la nota,
+    // controlli (pedale, mod wheel, espressione), bend e pressione anche alle code impegnate.
+    for (const auto meta : incoming)
     {
         const auto m = meta.getMessage();
         const int pos = juce::jmin (meta.samplePosition, numSamples - 1);
 
-        if (m.isNoteOff())
+        if (m.isNoteOff() || m.isAftertouch())
         {
             LiveChain* target = &active;
             for (auto& t : tails)
@@ -378,13 +408,19 @@ void Station::renderAdd (juce::AudioBuffer<float>& out, const juce::MidiBuffer& 
                     target = &t;
             target->midi.addEvent (m, pos);
         }
-        else if (m.isSustainPedalOn() || m.isSustainPedalOff() || m.isPitchWheel()
-                 || m.isAllNotesOff() || m.isAllSoundOff())
+        else if (m.isAllNotesOff() || m.isAllSoundOff())
         {
             active.midi.addEvent (m, pos);
             for (auto& t : tails)
                 if (isLive (t))
                     t.midi.addEvent (m, pos);
+        }
+        else if (m.isController() || m.isPitchWheel() || m.isChannelPressure())
+        {
+            active.midi.addEvent (m, pos);
+            for (size_t i = 0; i < tails.size(); ++i)
+                if (engaged[i])
+                    tails[i].midi.addEvent (m, pos);
         }
         else
         {
@@ -433,7 +469,6 @@ void Station::renderAdd (juce::AudioBuffer<float>& out, const juce::MidiBuffer& 
     }
 
     // Code: suonano finche' hanno note o pedale, poi 3 s, poi sfumano.
-    float fadeGains[4096];
     for (auto& t : tails)
     {
         if (! isLive (t))
@@ -451,21 +486,21 @@ void Station::renderAdd (juce::AudioBuffer<float>& out, const juce::MidiBuffer& 
             }
         }
 
-        const int n = juce::jmin (numSamples, (int) std::size (fadeGains));
-        for (int i = 0; i < n; ++i)
+        for (int i = 0; i < numSamples; ++i)
         {
             if (t.state == TailState::fading)
                 t.fadeGain = juce::jmax (0.0f, t.fadeGain - t.fadeStep);
-            fadeGains[i] = t.fadeGain;
+            fadeGains[(size_t) i] = t.fadeGain;
         }
-        for (int i = n; i < numSamples; ++i)
-            fadeGains[i] = t.fadeGain;
 
         if (! doPanic)
-            addInto (t.buffer, juce::jmax (1, juce::jmin (2, t.chain.instrument->getTotalNumOutputChannels())), fadeGains);
+            addInto (t.buffer, juce::jmax (1, juce::jmin (2, t.chain.instrument->getTotalNumOutputChannels())), fadeGains.data());
 
         if (t.state == TailState::fading && t.fadeGain <= 0.0f)
+        {
             t.state = TailState::finished;   // le istanze vengono ritirate dal message thread
+            tailFinished = true;
+        }
     }
 
     const int outChannels = out.getNumChannels();
@@ -476,3 +511,5 @@ void Station::renderAdd (juce::AudioBuffer<float>& out, const juce::MidiBuffer& 
             out.addSample (ch, i, sum.getSample (juce::jmin (ch, 1), i) * g);
     }
 }
+
+void Station::runWithLockHeldForTest (const std::function<void()>& f) { const juce::SpinLock::ScopedLockType sl (lock); f(); }

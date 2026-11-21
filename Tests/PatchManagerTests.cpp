@@ -100,6 +100,25 @@ public:
             expect (! pm.lastErrors().isEmpty());
         }
 
+        beginTest ("risalvare dopo un plugin mancante non lo cancella dalla patch");
+        {
+            StageEngine e; e.prepare (48000.0, bs);
+            Library lib; Factory f;
+            PatchManager pm (e, lib, f.make());
+            Patch p; p.name = "Con fantasma";
+            p.stations[0].instrument.portableId = "VST3|Nessuno|Fantasma|1";
+            p.stations[0].instrument.name = "Fantasma";
+            p.stations[0].instrument.state.append ("stato", 5);
+            p.stations[2].instrument.portableId = "Fake||FakeInstrument|0";
+            lib.set (0, 0, p);
+            pm.recall (0, 0);
+            e.station (2).setGainDb (-6.0f);
+            pm.saveCurrentTo (0, 0, "Con fantasma");
+            const auto& saved = lib.get (0, 0)->stations[0].instrument;
+            expectEquals (saved.portableId, juce::String ("VST3|Nessuno|Fantasma|1"));
+            expect (saved.state.getSize() == 5);
+        }
+
         beginTest ("due richiami di fila: vince l'ultimo");
         {
             StageEngine e; e.prepare (48000.0, bs);

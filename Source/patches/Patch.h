@@ -53,6 +53,8 @@ public:
     bool loadFrom (const juce::File&);
 
     static juce::File dailyBackupFor (const juce::File& libraryFile, juce::Time);
+    // Sposta un file illeggibile in libreria-danneggiata-<data>.xml; restituisce il nuovo percorso.
+    static juce::File setAsideUnreadable (const juce::File& libraryFile);
 
 private:
     static bool valid (int bank, int index);

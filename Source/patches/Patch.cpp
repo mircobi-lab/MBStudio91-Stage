@@ -169,8 +169,8 @@ bool Library::saveTo (const juce::File& f) const
 bool Library::loadFrom (const juce::File& f)
 {
     auto xml = juce::parseXML (f);
-    if (xml == nullptr)
-        return false;
+    if (xml == nullptr || ! xml->hasTagName (libraryId.toString()))
+        return false;   // illeggibile o non e' una libreria: niente viene caricato
     fromValueTree (juce::ValueTree::fromXml (*xml));
     return true;
 }
@@ -179,4 +179,12 @@ juce::File Library::dailyBackupFor (const juce::File& libraryFile, juce::Time wh
 {
     return libraryFile.getSiblingFile (libraryFile.getFileNameWithoutExtension() + "-"
                                        + when.formatted ("%Y-%m-%d") + libraryFile.getFileExtension());
+}
+
+juce::File Library::setAsideUnreadable (const juce::File& f)
+{
+    const auto dest = f.getSiblingFile (f.getFileNameWithoutExtension() + "-danneggiata-"
+                                        + juce::Time::getCurrentTime().formatted ("%Y-%m-%d-%H%M%S")
+                                        + f.getFileExtension());
+    return f.moveFileTo (dest) ? dest : juce::File();
 }

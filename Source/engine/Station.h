@@ -38,6 +38,7 @@ public:
     // Message thread: istanze delle code terminate (onBeforeInstanceRemoved gia' chiamato).
     std::vector<std::unique_ptr<juce::AudioPluginInstance>> takeFinishedInstances();
     bool hasTailChain() const;
+    void runWithLockHeldForTest (const std::function<void()>&);
 
     void setLoadError (juce::String);
     juce::String getLoadError() const;
@@ -90,8 +91,10 @@ private:
     LiveChain active;
     std::array<LiveChain, maxTails> tails;
 
-    juce::MidiBuffer emptyMidi;
+    juce::MidiBuffer emptyMidi, incoming, deferredMidi;   // deferred: MIDI arrivato mentre il lock era occupato
     juce::AudioBuffer<float> mix;
+    std::vector<float> fadeGains;                          // guadagno per campione delle code
+    std::atomic<bool> tailFinished { false };              // evita di prendere il lock se non c'e' nulla da ritirare
 
     juce::SmoothedValue<float> gain;
     std::atomic<float> targetGain { 1.0f };

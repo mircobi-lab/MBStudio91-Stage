@@ -34,12 +34,24 @@ public:
 
         // Libreria delle patch, con una copia di sicurezza al giorno.
         const auto libFile = AppPaths::libraryFile();
+        juce::String libraryWarning;
         if (libFile.existsAsFile())
         {
-            const auto backup = Library::dailyBackupFor (libFile, juce::Time::getCurrentTime());
-            if (! backup.existsAsFile())
-                libFile.copyFileTo (backup);
-            library.loadFrom (libFile);
+            if (library.loadFrom (libFile))
+            {
+                const auto backup = Library::dailyBackupFor (libFile, juce::Time::getCurrentTime());
+                if (! backup.existsAsFile())
+                    libFile.copyFileTo (backup);
+            }
+            else
+            {
+                // Il file illeggibile non viene sovrascritto: si sposta da parte e lo si dice.
+                const auto moved = Library::setAsideUnreadable (libFile);
+                libraryWarning = "La libreria delle patch non si e' potuta leggere ed e' stata messa da parte come\n"
+                               + (moved != juce::File() ? moved.getFullPathName() : libFile.getFullPathName())
+                               + "\n\nNella stessa cartella ci sono le copie giornaliere (libreria-AAAA-MM-GG.xml): "
+                                 "per recuperarne una, chiudi l'app e rinominala libreria.xml.";
+            }
         }
 
         patches = std::make_unique<PatchManager> (*engine, library,
@@ -62,6 +74,9 @@ public:
         auto* contentPtr = content.get();
         mainWindow = std::make_unique<MainWindow> (getApplicationName(), std::move (content));
         contentPtr->startInitialScanIfNeeded (listExisted);
+
+        if (libraryWarning.isNotEmpty())
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "Libreria delle patch", libraryWarning);
     }
 
     void shutdown() override

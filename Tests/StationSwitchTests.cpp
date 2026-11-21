@@ -112,6 +112,67 @@ public:
             expectWithinAbsoluteError (runFor (s, 0.01), 0.0f, 1.0e-6f);
         }
 
+        beginTest ("il MIDI arrivato mentre la postazione e' occupata non va perso");
+        {
+            Station s; s.prepare (sr, bs);
+            auto a = std::make_unique<FakeInstrument>(); auto* pa = a.get();
+            s.setInstrument (std::move (a));
+            runFor (s, 0.01, msg ({ on (60) }));
+            s.runWithLockHeldForTest ([&] { runFor (s, 0.001, msg ({ off (60) })); });
+            runFor (s, 0.01);
+            expect (pa->receivedNoteOff (60), "il note-off va consegnato al blocco successivo");
+            expect (pa->notes.empty());
+        }
+
+        beginTest ("blocchi audio piu' grandi di 4096 campioni con una coda in sfumatura");
+        {
+            Station s; s.prepare (sr, bs);
+            s.setInstrument (std::make_unique<RingingInstrument>());
+            runFor (s, 0.01, msg ({ on (60), off (60) }));
+            s.setChain (chainWith (std::make_unique<FakeInstrument>()));
+            juce::AudioBuffer<float> big (2, 5000);
+            for (int i = 0; i < 40; ++i)
+            {
+                big.clear();
+                s.renderAdd (big, {});
+            }
+            expect (big.getMagnitude (0, 5000) < 1.0e-6f);
+            expectEquals ((int) s.takeFinishedInstances().size(), 1);
+        }
+
+        beginTest ("mod wheel, espressione e aftertouch arrivano anche al suono in coda");
+        {
+            Station s; s.prepare (sr, bs);
+            auto a = std::make_unique<FakeInstrument>(); auto* pa = a.get();
+            auto b = std::make_unique<FakeInstrument>(); auto* pb = b.get();
+            s.setInstrument (std::move (a));
+            runFor (s, 0.01, msg ({ on (60) }));
+            s.setChain (chainWith (std::move (b)));
+            runFor (s, 0.01, msg ({ juce::MidiMessage::controllerEvent (1, 1, 90),
+                                    juce::MidiMessage::controllerEvent (1, 11, 40),
+                                    juce::MidiMessage::aftertouchChange (1, 60, 70),
+                                    juce::MidiMessage::channelPressureChange (1, 50) }));
+            expect (pa->receivedController (1));
+            expect (pa->receivedController (11));
+            bool polyOnOld = false, polyOnNew = false, pressureOnOld = false;
+            for (const auto& m : pa->received) { polyOnOld |= m.isAftertouch(); pressureOnOld |= m.isChannelPressure(); }
+            for (const auto& m : pb->received) polyOnNew |= m.isAftertouch();
+            expect (polyOnOld && ! polyOnNew);
+            expect (pressureOnOld);
+            expect (pb->receivedController (1));
+        }
+
+        beginTest ("il pedale premuto dopo il cambio non tiene in vita una coda senza note");
+        {
+            Station s; s.prepare (sr, bs);
+            auto a = std::make_unique<FakeInstrument>(); auto* pa = a.get();
+            s.setInstrument (std::move (a));
+            runFor (s, 0.01, msg ({ on (60), off (60) }));
+            s.setChain (chainWith (std::make_unique<FakeInstrument>()));
+            runFor (s, 0.01, msg ({ juce::MidiMessage::controllerEvent (1, 64, 127) }));
+            expect (! pa->receivedController (64));
+        }
+
         beginTest ("le istanze della nuova catena sono preparate");
         {
             Station s; s.prepare (sr, bs);

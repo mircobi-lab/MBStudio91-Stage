@@ -60,6 +60,8 @@ private:
     std::atomic<bool> applying { false };
     std::shared_ptr<bool> alive = std::make_shared<bool> (true);   // per i caricamenti che finiscono dopo la chiusura
     juce::StringArray errors;
+    // Plugin che non si sono caricati nell'ultimo richiamo: SALVA li conserva nella patch.
+    std::array<std::array<std::optional<PluginSlot>, 1 + Station::maxEffects>, StageEngine::numStations> failedSlots;
 
     JUCE_DECLARE_NON_COPYABLE (PatchManager)
 };

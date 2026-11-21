@@ -47,9 +47,11 @@ Patch PatchManager::capture (const juce::String& name) const
     {
         auto& st = engine.station (i);
         auto& sp = p.stations[(size_t) i];
-        sp.instrument = captureSlot (st.getInstrument());
+        const auto& failed = failedSlots[(size_t) i];
+        sp.instrument = st.getInstrument() != nullptr || ! failed[0].has_value() ? captureSlot (st.getInstrument()) : *failed[0];
         for (int fx = 0; fx < Station::maxEffects; ++fx)
-            sp.effects[(size_t) fx] = captureSlot (st.getEffect (fx));
+            sp.effects[(size_t) fx] = st.getEffect (fx) != nullptr || ! failed[(size_t) fx + 1].has_value()
+                                        ? captureSlot (st.getEffect (fx)) : *failed[(size_t) fx + 1];
         sp.gainDb = st.getGainDb();
         sp.muted = st.isMuted();
         sp.zone = engine.getZone (i);
@@ -147,6 +149,12 @@ void PatchManager::apply (PendingRecall& req)
     {
         const auto& sp = req.patch.stations[(size_t) s];
         auto& chain = req.chains[(size_t) s];
+
+        auto& failed = failedSlots[(size_t) s];
+        failed[0] = (sp.instrument.portableId.isNotEmpty() && chain.instrument == nullptr) ? std::make_optional (sp.instrument) : std::nullopt;
+        for (int fx = 0; fx < Station::maxEffects; ++fx)
+            failed[(size_t) fx + 1] = (sp.effects[(size_t) fx].portableId.isNotEmpty() && chain.effects[(size_t) fx] == nullptr)
+                                          ? std::make_optional (sp.effects[(size_t) fx]) : std::nullopt;
 
         auto restore = [] (juce::AudioPluginInstance* p, const PluginSlot& slot)
         {

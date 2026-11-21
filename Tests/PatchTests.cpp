@@ -85,6 +85,25 @@ public:
             expect (! b.get (3, 3).has_value());
         }
 
+        beginTest ("libreria illeggibile: non si carica e viene messa da parte");
+        {
+            const auto dir = juce::File::createTempFile ("lib");
+            dir.createDirectory();
+            const auto f = dir.getChildFile ("libreria.xml");
+            f.replaceWithText ("<LIBRERIA><PATCH name='rotto'");   // XML troncato
+            Library lib;
+            expect (! lib.loadFrom (f));
+            const auto moved = Library::setAsideUnreadable (f);
+            expect (moved.existsAsFile());
+            expect (! f.existsAsFile());
+            expect (moved.getFileName().startsWith ("libreria-danneggiata-"));
+
+            const auto other = dir.getChildFile ("altro.xml");
+            other.replaceWithText ("<ALTRO/>");
+            expect (! lib.loadFrom (other));   // XML valido ma non e' una libreria
+            dir.deleteRecursively();
+        }
+
         beginTest ("copia giornaliera");
         {
             const auto f = juce::File ("/tmp/x/libreria.xml");
