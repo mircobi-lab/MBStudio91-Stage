@@ -62,6 +62,7 @@ juce_add_binary_data(StageAssets SOURCES Assets/Fonts/BebasNeue-Regular.ttf)
 target_sources(MBStudio91Stage PRIVATE
     Source/Main.cpp
     Source/ui/MainComponent.cpp
+    Source/ui/StationPanel.cpp
     Source/ui/StageLookAndFeel.cpp
     ${STAGE_CORE_SOURCES})
 

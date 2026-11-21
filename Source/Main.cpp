@@ -27,6 +27,7 @@ public:
 
         engine = std::make_unique<StageEngine>();
         engine->start();
+        engine->loadKeyboardSettings();
 
         auto content = std::make_unique<MainComponent> (*engine, *catalog);
         auto* contentPtr = content.get();
@@ -38,7 +39,10 @@ public:
     {
         mainWindow = nullptr;   // chiude prima le finestre dei plugin
         if (engine != nullptr)
+        {
+            engine->saveKeyboardSettings();
             engine->stop();     // salva le impostazioni audio
+        }
         engine = nullptr;
         if (catalog != nullptr)
             catalog->save();
