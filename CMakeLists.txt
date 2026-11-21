@@ -26,6 +26,8 @@ set(STAGE_CORE_SOURCES
     Source/engine/KeyboardRouter.cpp
     Source/patches/Patch.cpp
     Source/patches/PatchManager.cpp
+    Source/control/LaunchpadMapping.cpp
+    Source/control/LaunchpadController.cpp
     Source/plugins/PluginCatalog.cpp
     Source/plugins/ScannerProcess.cpp
 )
