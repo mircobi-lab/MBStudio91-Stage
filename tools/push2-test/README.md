@@ -42,6 +42,18 @@ rotativi da `doc/Push2-map.json` (rotativi CC 71-78, tocco note 0-7, tasti sopra
 display CC 102-109), valore relativo dei rotativi in complemento a due. Prima di cambiare le voci 1-16
 della palette colori le legge dal Push e le rimette a posto quando chiudi l'app.
 
+## Display senza il Push collegato
+
+Se il Push non c'e' o Live tiene occupata l'interfaccia, l'app prova il simulatore
+[push-simulator](https://github.com/ricardoabreu/push-simulator) sulla porta
+127.0.0.1:48484 e gli manda lo stesso frame preceduto da `PSMF` e dalla lunghezza su
+4 byte, come si aspetta il suo `display_feed.go`. Li' il frame parte solo quando
+cambia, mentre al display vero va rimandato sempre. Se il Push si ripresenta, entro
+cinque secondi l'app torna sull'USB e lascia il socket.
+
+La porta si cambia con `PUSH_SIM_DISPLAY_FEED_PORT`, lo stesso nome che legge il
+simulatore. In finestra la riga Display dice quale dei due sta usando.
+
 ## Come usarla
 
 1. Chiudi Ableton Live: tiene occupato il display e manderebbe i suoi colori ai pad.

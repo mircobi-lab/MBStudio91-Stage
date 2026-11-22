@@ -742,8 +742,9 @@ void MainComponent::updateStatus()
     switch (display.getState())
     {
         case Push2Display::State::connected: ds = "Display: collegato"; break;
+        case Push2Display::State::simulator: ds = "Display: sul simulatore (127.0.0.1:48484)"; break;
         case Push2Display::State::busy:      ds = "Display: occupato, chiudi Ableton Live e attendi"; break;
-        case Push2Display::State::searching: ds = "Display: in attesa del Push 2"; break;
+        case Push2Display::State::searching: ds = "Display: in attesa del Push 2 o del simulatore"; break;
     }
     if (const auto err = display.getLastError(); err.isNotEmpty() && display.getState() != Push2Display::State::connected)
         ds << "  (" << err << ")";
