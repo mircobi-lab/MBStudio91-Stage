@@ -18,3 +18,23 @@ public:
 private:
     juce::Typeface::Ptr bebas;
 };
+
+// Il marchio come sulla plastica di un controller: stampato (bianco) in alto a
+// sinistra col badge del prodotto, impresso (inciso nel nero) in basso a destra.
+// Tiene le copie tinte della maschera, cosi' il disegno non le ricalcola ogni volta.
+class MBStudioBrand
+{
+public:
+    MBStudioBrand();
+
+    void paintPrinted (juce::Graphics&, juce::Rectangle<int> area, const juce::String& product) const;
+    void paintDebossed (juce::Graphics&, juce::Rectangle<int> area) const;
+
+    int widthFor (int height) const;   // quanto spazio prende il logo a quell'altezza
+
+private:
+    static juce::Image tint (const juce::Image& mask, juce::Colour);
+    void drawMark (juce::Graphics&, const juce::Image&, juce::Rectangle<int>, float opacity) const;
+
+    juce::Image printed, light, shadow, body;
+};

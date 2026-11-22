@@ -78,7 +78,9 @@ juce_add_gui_app(MBStudio91Stage
     NEEDS_CURL FALSE
     NEEDS_WEB_BROWSER FALSE)
 
-juce_add_binary_data(StageAssets SOURCES Assets/Fonts/BebasNeue-Regular.ttf)
+juce_add_binary_data(StageAssets SOURCES
+    Assets/Fonts/BebasNeue-Regular.ttf
+    Assets/brand/mbstudio91_wordmark.png)
 
 target_sources(MBStudio91Stage PRIVATE
     Source/Main.cpp

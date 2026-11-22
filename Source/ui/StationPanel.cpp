@@ -48,10 +48,19 @@ private:
 };
 
 //==============================================================================
+juce::String StationPanel::stationLabel() const
+{
+    const auto a = engine.keyboards().assignmentFor (index);
+    const auto what = a.has_value()
+                        ? KeyboardRouter::kindLabel (KeyboardRouter::kindForDeviceName (a->deviceName))
+                        : juce::String ("LIBERA");
+    return juce::String (index + 1) + "  " + what;
+}
+
 StationPanel::StationPanel (StageEngine& e, PluginCatalog& c, int i)
     : engine (e), catalog (c), index (i), station (e.station (i))
 {
-    title.setText (juce::String (index + 1) + "  POSTAZIONE " + juce::String (index + 1), juce::dontSendNotification);
+    title.setText (stationLabel(), juce::dontSendNotification);
     title.setFont (StageLookAndFeel::titleFont (26.0f));
     addAndMakeVisible (title);
 
@@ -356,7 +365,7 @@ void StationPanel::openEditor (int slot)
     }
 
     editors[inst] = std::make_unique<EditorWindow> (*inst,
-        inst->getName() + "  -  POSTAZIONE " + juce::String (index + 1),
+        inst->getName() + "  -  " + stationLabel(),
         [safe = juce::Component::SafePointer<StationPanel> (this), inst]
         {
             juce::MessageManager::callAsync ([safe, inst]
@@ -382,6 +391,7 @@ void StationPanel::timerCallback()
 
     const auto a = engine.keyboards().assignmentFor (index);
     const bool connected = engine.isStationDeviceConnected (index);
+    title.setText (stationLabel(), juce::dontSendNotification);
     deviceLabel.setText (a.has_value() ? a->deviceName.toUpperCase() : "NESSUNA TASTIERA", juce::dontSendNotification);
     deviceLabel.setColour (juce::Label::textColourId, connected || ! a.has_value() ? juce::Colours::white
                                                                                     : juce::Colours::grey);

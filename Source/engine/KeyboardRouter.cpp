@@ -93,6 +93,34 @@ int KeyboardRouter::suggestStationForDeviceName (const juce::String& name)
     return -1;   // le due Launchkey Mini hanno nomi simili: si assegnano con ASSEGNA
 }
 
+KeyboardRouter::DeviceKind KeyboardRouter::kindForDeviceName (const juce::String& name)
+{
+    // Tastiere: hanno i tasti, anche quando hanno pad e manopole in piu'
+    for (const char* k : { "keystation", "launchkey", "keylab", "keystep", "komplete kontrol",
+                           "oxygen", "mpk", "piano", "keyboard", "tastiera" })
+        if (name.containsIgnoreCase (k))
+            return DeviceKind::keyboard;
+
+    // Periferiche di controllo: pad, manopole, fader, niente tasti
+    for (const char* s : { "push", "launchpad", "launch control", "apc", "maschine", "beatstep",
+                           "nanokontrol", "x-touch", "xtouch", "faderport", "midi fighter" })
+        if (name.containsIgnoreCase (s))
+            return DeviceKind::surface;
+
+    return DeviceKind::other;
+}
+
+juce::String KeyboardRouter::kindLabel (DeviceKind k)
+{
+    switch (k)
+    {
+        case DeviceKind::keyboard: return "KEYB";
+        case DeviceKind::surface:  return "SURF";
+        case DeviceKind::other:    break;
+    }
+    return "MIDI";
+}
+
 std::unique_ptr<juce::XmlElement> KeyboardRouter::toXml() const
 {
     auto xml = std::make_unique<juce::XmlElement> ("TASTIERE");
