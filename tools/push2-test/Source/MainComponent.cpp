@@ -27,6 +27,7 @@ MainComponent::MainComponent()
     faces.bebas = bebas;
     faces.logoLight = juce::Typeface::createSystemTypefaceFor (BinaryData::ComfortaaLight_ttf, BinaryData::ComfortaaLight_ttfSize);
     faces.logoBold  = juce::Typeface::createSystemTypefaceFor (BinaryData::ComfortaaBold_ttf, BinaryData::ComfortaaBold_ttfSize);
+    faces.logo = juce::ImageCache::getFromMemory (BinaryData::mbstudio91wordmark_png, BinaryData::mbstudio91wordmark_pngSize);
     auto font = [this] (float h) { return juce::Font (juce::FontOptions().withTypeface (bebas).withHeight (h)); };
 
     title.setText ("MBSTUDIO91 STAGE  -  TEST PUSH 2", juce::dontSendNotification);

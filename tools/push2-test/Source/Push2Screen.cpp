@@ -26,6 +26,35 @@ TextPart mk (const juce::String& t)
 {
     return part (t, Style::regular, 0.14f, juce::Colour (0xffb0b0b0), 0.5f);
 }
+
+// Riduce la maschera del logo alla misura voluta facendo la media dei pixel: a questa
+// altezza il ridimensionamento normale sgranerebbe le lettere.
+juce::Image shrinkMask (const juce::Image& src, int w, int h)
+{
+    juce::Image out (juce::Image::ARGB, juce::jmax (1, w), juce::jmax (1, h), true);
+    const juce::Image::BitmapData in (src, juce::Image::BitmapData::readOnly);
+    juce::Image::BitmapData dst (out, juce::Image::BitmapData::writeOnly);
+
+    for (int y = 0; y < out.getHeight(); ++y)
+    {
+        const int y0 = y * in.height / out.getHeight();
+        const int y1 = juce::jmax (y0 + 1, (y + 1) * in.height / out.getHeight());
+
+        for (int x = 0; x < out.getWidth(); ++x)
+        {
+            const int x0 = x * in.width / out.getWidth();
+            const int x1 = juce::jmax (x0 + 1, (x + 1) * in.width / out.getWidth());
+
+            int sum = 0, n = 0;
+            for (int sy = y0; sy < y1; ++sy)
+                for (int sx = x0; sx < x1; ++sx, ++n)
+                    sum += in.getPixelColour (sx, sy).getAlpha();
+
+            dst.setPixelColour (x, y, juce::Colours::white.withAlpha ((juce::uint8) (sum / juce::jmax (1, n))));
+        }
+    }
+    return out;
+}
 } // namespace
 
 namespace devices
@@ -50,10 +79,11 @@ StyledText launchkey61Mk2()
              part ("61", Style::regular, 0.16f), mk ("MK2") };
 }
 
-// Da verificare sul pannello: per ora scritta normale
+// KEYSTATION grassetto, 88 normale, MK3 in negativo: come indicato da Mirco
 StyledText keystation88Mk3()
 {
-    return { part ("KEYSTATION", Style::regular), part ("88", Style::regular, 0.16f), mk ("MK3") };
+    return { part ("KEYSTATION", Style::bold), part ("88", Style::regular, 0.16f),
+             part ("MK3", Style::inverted, 0.16f, white, 0.5f) };
 }
 
 StyledText launchpadMiniMk1()
@@ -63,31 +93,26 @@ StyledText launchpadMiniMk1()
 }
 } // namespace devices
 
-StyledText pluginName (const juce::String& name, juce::Colour colour)
+StyledText cellName (const juce::String& name, juce::Colour colour)
 {
-    const auto upper = name.toUpperCase();
-    if (upper.isEmpty())
-        return {};
-    StyledText t { part (upper.substring (0, 1), Style::bold, 0.0f, colour) };
-    if (upper.length() > 1)
-        t.push_back (part (upper.substring (1), Style::regular, 0.0f, colour));
-    return t;
+    return { part (name.toUpperCase(), Style::regular, 0.0f, colour) };
 }
 
 StyledText logoStyleName (const juce::String& name, juce::Colour colour)
 {
-    StyledText t;
     const auto upper = name.toUpperCase();
-    for (int i = 0; i < upper.length();)
+    if (upper.isEmpty())
+        return {};
+
+    auto first = part (upper.substring (0, 1), Style::regular, 0.0f, colour);
+    first.face = TextPart::Face::logoBold;
+    StyledText t { first };
+
+    if (upper.length() > 1)
     {
-        const bool digit = juce::CharacterFunctions::isDigit (upper[i]);
-        int j = i;
-        while (j < upper.length() && juce::CharacterFunctions::isDigit (upper[j]) == digit)
-            ++j;
-        auto p = part (upper.substring (i, j), Style::regular, 0.0f, colour);
-        p.face = digit ? TextPart::Face::logoLight : TextPart::Face::logoBold;
-        t.push_back (p);
-        i = j;
+        auto rest = part (upper.substring (1), Style::regular, 0.0f, colour);
+        rest.face = TextPart::Face::logoLight;
+        t.push_back (rest);
     }
     return t;
 }
@@ -118,24 +143,24 @@ float drawStyledText (juce::Graphics& g, const StyledText& parts, float x, float
         // Comfortaa Bold e' meno spesso dello STUDIO del logo: lo ispessisco allo stesso modo
         const bool heavy = p.style == Style::bold || p.face == TextPart::Face::logoBold;
         const float boldStroke = h * (p.face == TextPart::Face::logoBold ? 0.075f : 0.05f);
-        const float pad = h * 0.14f;
+        const float padX = h * 0.20f, padY = h * 0.14f;
 
         float width = advance;
         if (heavy)
             width += boldStroke;
         if (p.style == Style::inverted)
-            width += 2.0f * pad;
+            width += 2.0f * padX;
 
         if (draw)
         {
-            const float textX = x + (p.style == Style::inverted ? pad : (heavy ? boldStroke * 0.5f : 0.0f));
+            const float textX = x + (p.style == Style::inverted ? padX : (heavy ? boldStroke * 0.5f : 0.0f));
             const auto placed = juce::AffineTransform::translation (textX, baseline);
 
             if (p.style == Style::inverted)
             {
                 g.setColour (p.colour);
-                g.fillRect (juce::Rectangle<float> (x, baseline + ink.getY() - pad,
-                                                    width, ink.getHeight() + 2.0f * pad));
+                g.fillRect (juce::Rectangle<float> (x, baseline + ink.getY() - padY,
+                                                    width, ink.getHeight() + 2.0f * padY));
                 g.setColour (juce::Colours::black);
                 g.fillPath (path, placed);
             }
@@ -184,7 +209,7 @@ juce::Image renderScreen (const std::vector<ScreenSetup>& setups, int active,
             g.drawRect (cell, 1.0f);
         }
 
-        const auto label = pluginName (s.plugin, on ? juce::Colours::black : s.colour.withMultipliedBrightness (0.85f));
+        const auto label = cellName (s.plugin, on ? juce::Colours::black : s.colour.withMultipliedBrightness (0.85f));
         const float h = 24.0f;
         const float w = drawStyledText (g, label, 0, 0, h, faces, false);
         drawStyledText (g, label, cell.getCentreX() - w * 0.5f, cell.getCentreY() + h * 0.36f, h, faces);
@@ -218,14 +243,35 @@ juce::Image renderScreen (const std::vector<ScreenSetup>& setups, int active,
         }
     }
 
-    // In basso: firma, firmware, chi cambia i setup
+    // In basso: logo MBSTUDIO91, firmware, chi cambia i setup
     juce::Font small (juce::FontOptions().withTypeface (faces.bebas).withHeight (22.0f));
-    g.setColour (juce::Colour (0xff9a9a9a));
-    g.setFont (small);
-    juce::String footer = "MBSTUDIO91 STAGE";
+    const float baseline = 150.0f;
+    float footX = 12.0f;
+
+    if (faces.logo.isValid())
+    {
+        // Il logo e' alto come le maiuscole del testo che lo segue
+        juce::GlyphArrangement cap;
+        cap.addLineOfText (small, "M", 0.0f, 0.0f);
+        juce::Path capPath;
+        cap.createPath (capPath);
+
+        const int logoH = juce::roundToInt (capPath.getBounds().getHeight());
+        const int logoW = juce::roundToInt ((float) logoH * (float) faces.logo.getWidth()
+                                                          / (float) faces.logo.getHeight());
+
+        g.setColour (juce::Colour (0xfff3f3f1).withAlpha (0.96f)); // stampato
+        g.drawImageAt (shrinkMask (faces.logo, logoW, logoH), (int) footX,
+                       juce::roundToInt (baseline) - logoH, true);
+        footX += (float) logoW + 10.0f;
+    }
+
+    juce::String footer = "STAGE";
     if (firmware.isNotEmpty())
         footer << "   -   PUSH 2 FW " << firmware;
-    g.drawText (footer, 12, 128, 600, 28, juce::Justification::centredLeft);
+    g.setColour (juce::Colour (0xff9a9a9a));
+    g.setFont (small);
+    g.drawText (footer, (int) footX, 128, 600, 28, juce::Justification::centredLeft);
 
     const float changerH = 22.0f;
     const float changerW = drawStyledText (g, setupChanger, 0, 0, changerH, faces, false);

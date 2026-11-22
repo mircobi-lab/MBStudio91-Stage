@@ -21,6 +21,7 @@ struct TextPart
 struct Faces
 {
     juce::Typeface::Ptr bebas, logoLight, logoBold;
+    juce::Image logo; // maschera bianca del marchio MBSTUDIO91
 };
 
 using StyledText = std::vector<TextPart>;
@@ -35,10 +36,10 @@ StyledText keystation88Mk3();
 StyledText launchpadMiniMk1();
 } // namespace devices
 
-// Nome del plugin: prima lettera in grassetto, il resto normale
-StyledText pluginName (const juce::String& name, juce::Colour colour);
+// Nome del plugin nelle caselle in alto: tutto testo normale
+StyledText cellName (const juce::String& name, juce::Colour colour);
 
-// Nome nello stile del logo MBSTUDIO91: lettere spesse, numeri sottili (come STUDIO e 91)
+// Nome al centro, stile logo MBSTUDIO91: solo l'iniziale spessa, il resto sottile
 StyledText logoStyleName (const juce::String& name, juce::Colour colour);
 
 struct ScreenSetup

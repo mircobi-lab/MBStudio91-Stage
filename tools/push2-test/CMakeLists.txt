@@ -54,7 +54,8 @@ juce_add_gui_app(MBStudio91Push2Test
 juce_add_binary_data(Push2TestAssets SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Assets/Fonts/BebasNeue-Regular.ttf
     Assets/Fonts/Comfortaa-Light.ttf
-    Assets/Fonts/Comfortaa-Bold.ttf)
+    Assets/Fonts/Comfortaa-Bold.ttf
+    Assets/brand/mbstudio91-wordmark.png)
 
 target_sources(MBStudio91Push2Test PRIVATE
     Source/Main.cpp
