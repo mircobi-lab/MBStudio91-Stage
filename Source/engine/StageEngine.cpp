@@ -1,4 +1,5 @@
 #include "StageEngine.h"
+#include "../plugins/PluginCatalog.h"
 #include "settings/AppPaths.h"
 
 namespace
@@ -308,11 +309,37 @@ void StageEngine::loadKeyboardSettings()
     }
 
     if (auto xml = juce::parseXML (AppPaths::stationsFile()))
+        savedStations = stationsFromValueTree (juce::ValueTree::fromXml (*xml));
+
+    // Zona, volume e mute si ripristinano subito; i plugin li carica la finestra,
+    // perche' serve il catalogo e l'operazione e' lenta.
+    for (int i = 0; i < numStations; ++i)
     {
-        const auto tree = juce::ValueTree::fromXml (*xml);
-        for (int i = 0; i < numStations && i < tree.getNumChildren(); ++i)
-            processors[(size_t) i].setZone (KeyZone::fromValueTree (tree.getChild (i)));
+        const auto& s = savedStations[(size_t) i];
+        processors[(size_t) i].setZone (s.zone);
+        stations[(size_t) i].setGainDb (s.gainDb);
+        stations[(size_t) i].setMuted (s.muted);
     }
+}
+
+StationStates StageEngine::captureStationStates() const
+{
+    StationStates out;
+    for (int i = 0; i < numStations; ++i)
+    {
+        auto& s = out[(size_t) i];
+        const auto& station = stations[(size_t) i];
+        s.zone = processors[(size_t) i].getZone();
+        s.gainDb = station.getGainDb();
+        s.muted = station.isMuted();
+
+        if (auto* inst = station.getInstrument())
+            s.instrumentId = makePortableId (inst->getPluginDescription());
+        for (int e = 0; e < Station::maxEffects && e < StationState::maxEffects; ++e)
+            if (auto* fx = station.getEffect (e))
+                s.effectIds[(size_t) e] = makePortableId (fx->getPluginDescription());
+    }
+    return out;
 }
 
 void StageEngine::saveKeyboardSettings() const
@@ -320,10 +347,7 @@ void StageEngine::saveKeyboardSettings() const
     if (auto xml = router.toXml())
         xml->writeTo (AppPaths::keyboardsFile());
 
-    juce::ValueTree tree ("POSTAZIONI");
-    for (const auto& p : processors)
-        tree.appendChild (p.getZone().toValueTree(), nullptr);
-    if (auto xml = tree.createXml())
+    if (auto xml = stationsToValueTree (captureStationStates()).createXml())
         xml->writeTo (AppPaths::stationsFile());
 }
 

@@ -8,6 +8,8 @@ Il progetto è descritto in `docs/superpowers/specs/2026-11-21-mbstudio91-stage-
 
 - Apre la scheda audio scelta nelle impostazioni e se la ricorda al riavvio.
 - Cerca i plugin VST3 e AU installati. La ricerca gira in un processo separato: se un plugin si blocca o va in crash durante la scansione, viene scartato e l'app resta aperta.
+- Oltre alle cartelle standard del sistema puoi aggiungere le tue, per esempio dove compili i plugin MBStudio91: il tasto CARTELLE apre l'elenco, una cartella per riga.
+- Ogni postazione ricorda quali plugin aveva, con volume e mute: al riavvio Stage li ricarica da sola. Se uno dei plugin non risulta piu' nell'elenco, per esempio perche' l'hai appena ricompilato, rifa' la scansione una volta e riprova.
 - Carica sulla postazione 1 uno strumento e fino a tre effetti, con volume e mute.
 - Apre la finestra originale di ogni plugin con APRI PLUGIN.
 - Suona da tutte le tastiere MIDI collegate (la Launchpad è esclusa: servirà per le patch dalla Fase 3).
@@ -56,9 +58,14 @@ Tutto in `~/Music/MBStudio91 Stage/`:
 | `macchina.settings` | scheda audio, frequenza e buffer |
 | `scan-in-corso.txt` | file temporaneo della scansione |
 | `tastiere.xml` | quale tastiera suona quale postazione |
-| `postazioni.xml` | trasposizione, estensione e curva di ogni postazione |
+| `postazioni.xml` | zona, volume, mute e plugin di ogni postazione |
+| `cartelle-plugin.txt` | cartelle in piu' da battere nella scansione, una per riga |
 
 Per rifare la ricerca da zero basta premere SCANSIONA PLUGIN. Per azzerare tutto, chiudi l'app e cancella `plugins.xml`.
+
+I plugin di una postazione sono salvati come identificativo portabile, cioe'
+`formato|produttore|nome|id`: se sposti un plugin in un'altra cartella Stage lo ritrova
+lo stesso dopo una scansione, perche' non dipende dal percorso del file.
 
 ## Compilare
 

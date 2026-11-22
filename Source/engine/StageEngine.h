@@ -6,6 +6,7 @@
 #include "Station.h"
 #include "NoteProcessor.h"
 #include "KeyboardRouter.h"
+#include "StationState.h"
 #include <functional>
 
 // Motore audio: 4 postazioni mescolate su un'uscita stereo, MIDI dalle tastiere, PANIC.
@@ -50,6 +51,10 @@ public:
     void loadKeyboardSettings();        // tastiere.xml + postazioni.xml
     void saveKeyboardSettings() const;
 
+    // Com'erano le postazioni adesso, e com'erano nel file all'ultimo avvio.
+    StationStates captureStationStates() const;
+    const StationStates& savedStationStates() const { return savedStations; }
+
     std::function<void (int station)> onLearnFinished;   // chiamato sul message thread
 
     // Dispositivi riservati al controllo (Launchpad): non suonano le postazioni.
@@ -80,6 +85,7 @@ private:
     std::array<std::atomic<juce::uint32>, numStations> activity {};
     std::array<juce::MidiBuffer, numStations> rawMidi;
     KeyboardRouter router;
+    StationStates savedStations;
 
     juce::SpinLock injectLock;
     std::array<juce::MidiBuffer, numStations> injected, stationMidi;

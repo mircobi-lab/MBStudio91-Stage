@@ -23,6 +23,30 @@ public:
         expectEquals (makePortableId (makeDesc ("VST3", "LennarDigital", "Sylenth1", 0x4c4e5331)),
                       juce::String ("VST3|LennarDigital|Sylenth1|4c4e5331"));
 
+        beginTest ("le cartelle in piu' finiscono nel percorso di ricerca");
+        {
+            juce::VST3PluginFormat vst3;
+            const auto standard = vst3.getDefaultLocationsToSearch();
+
+            juce::TemporaryFile dirTmp;
+            const auto dir = dirTmp.getFile();
+            dir.createDirectory();
+            const auto inesistente = dir.getSiblingFile ("non-esiste-davvero-12345");
+
+            const auto path = PluginCatalog::searchPathFor (vst3, { dir.getFullPathName(),
+                                                                    inesistente.getFullPathName() });
+            juce::StringArray paths;
+            for (int i = 0; i < path.getNumPaths(); ++i)
+                paths.add (path[i].getFullPathName());
+
+            expect (paths.contains (dir.getFullPathName()), "la cartella vera deve esserci");
+            expect (! paths.contains (inesistente.getFullPathName()), "quella che non esiste no");
+            expect (path.getNumPaths() >= standard.getNumPaths(), "le standard restano");
+
+            // senza cartelle in piu' il percorso e' quello di sempre
+            expectEquals (PluginCatalog::searchPathFor (vst3, {}).getNumPaths(), standard.getNumPaths());
+        }
+
         juce::TemporaryFile listTmp (".xml"), pedalTmp (".txt");
 
         beginTest ("salva e ricarica l'elenco dei plugin");

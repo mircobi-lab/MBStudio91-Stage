@@ -298,6 +298,7 @@ void StationPanel::slotChosen (int slot)
         if (slot == 0) station.setInstrument (nullptr);
         else           station.setEffect (slot - 1, nullptr);
         station.setLoadError ({});
+        engine.saveKeyboardSettings();   // cosi' al prossimo avvio la postazione torna com'e' adesso
         return;
     }
 
@@ -327,6 +328,7 @@ void StationPanel::slotChosen (int slot)
             if (slot == 0) self->station.setInstrument (std::move (inst));
             else           self->station.setEffect (slot - 1, std::move (inst));
             self->station.setLoadError ({});
+            self->engine.saveKeyboardSettings();
         });
 }
 
