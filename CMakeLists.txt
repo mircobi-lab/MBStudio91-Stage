@@ -11,7 +11,17 @@ FetchContent_Declare(JUCE
     GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
     GIT_TAG        8.0.15
     GIT_SHALLOW    TRUE)
-FetchContent_MakeAvailable(JUCE)
+# libusb: serve solo per il display del Push 2, compilata statica dentro l'app
+set(LIBUSB_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(LIBUSB_INSTALL_TARGETS OFF CACHE BOOL "" FORCE)
+set(LIBUSB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(LIBUSB_BUILD_TESTING OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(libusb
+    GIT_REPOSITORY https://github.com/libusb/libusb-cmake.git
+    GIT_TAG        v1.0.30-0
+    GIT_SHALLOW    TRUE)
+
+FetchContent_MakeAvailable(JUCE libusb)
 
 # Sorgenti del motore, condivisi da app e test.
 # (I moduli JUCE sono librerie INTERFACE: compilarli in una libreria statica
@@ -30,6 +40,11 @@ set(STAGE_CORE_SOURCES
     Source/control/LaunchpadMapping.cpp
     Source/control/LaunchpadController.cpp
     Source/control/SurfaceCoordinator.cpp
+    Source/control/Push2Mapping.cpp
+    Source/control/Push2Controller.cpp
+    Source/push2/Push2Protocol.cpp
+    Source/push2/Push2Display.cpp
+    Source/push2/Push2SurfaceScreen.cpp
     Source/plugins/PluginCatalog.cpp
     Source/plugins/ScannerProcess.cpp
 )
@@ -76,6 +91,7 @@ target_sources(MBStudio91Stage PRIVATE
 target_include_directories(MBStudio91Stage PRIVATE Source)
 target_compile_definitions(MBStudio91Stage PRIVATE ${STAGE_DEFINITIONS})
 target_link_libraries(MBStudio91Stage PRIVATE
+    usb-1.0
     StageAssets
     ${STAGE_MODULES}
     juce::juce_recommended_config_flags
@@ -93,6 +109,7 @@ target_sources(StageTests PRIVATE
 target_include_directories(StageTests PRIVATE Source Tests)
 target_compile_definitions(StageTests PRIVATE ${STAGE_DEFINITIONS} JUCE_MODAL_LOOPS_PERMITTED=1)
 target_link_libraries(StageTests PRIVATE
+    usb-1.0
     ${STAGE_MODULES}
     juce::juce_recommended_config_flags
     juce::juce_recommended_warning_flags)

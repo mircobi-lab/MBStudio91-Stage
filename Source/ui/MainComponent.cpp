@@ -1,5 +1,6 @@
 #include "MainComponent.h"
 #include "StageLookAndFeel.h"
+#include "settings/AppPaths.h"
 
 MainComponent::MainComponent (StageEngine& e, PluginCatalog& c, PatchManager& pm, Library& lib, SurfaceCoordinator& sc)
     : engine (e), catalog (c), patches (pm), coordinator (sc)
@@ -35,7 +36,7 @@ MainComponent::MainComponent (StageEngine& e, PluginCatalog& c, PatchManager& pm
     panicButton.setColour (juce::TextButton::buttonColourId, StageLookAndFeel::panicRed);
     panicButton.onClick = [this] { engine.panicAll(); };
     audioButton.onClick = [this] { showAudioSettings(); };
-    scanButton.onClick  = [this] { startScan(); };
+    scanButton.onClick  = [this] { showScanMenu(); };
 
     for (int i = 0; i < StageEngine::numStations; ++i)
     {
@@ -74,6 +75,8 @@ MainComponent::~MainComponent()
     patches.onStateChanged = nullptr;
     // Il dialog va chiuso prima che il motore (e il suo AudioDeviceManager) venga distrutto.
     if (auto* w = audioSettingsWindow.getComponent())
+        delete w;
+    if (auto* w = foldersWindow.getComponent())
         delete w;
 }
 
@@ -139,12 +142,109 @@ void MainComponent::showAudioSettings()
     audioSettingsWindow = o.launchAsync();
 }
 
+// Il tasto apre un menu: la scansione vera e la lista delle cartelle in piu'.
+void MainComponent::showScanMenu()
+{
+    juce::PopupMenu m;
+    m.addItem (1, "Scansiona adesso", ! catalog.isScanning());
+    m.addItem (2, "Cartelle in piu'...");
+    m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (scanButton),
+                     [safe = juce::Component::SafePointer<MainComponent> (this)] (int choice)
+    {
+        if (auto* self = safe.getComponent())
+        {
+            if (choice == 1) self->startScan();
+            if (choice == 2) self->showScanFolders();
+        }
+    });
+}
+
+void MainComponent::loadScanFolders()
+{
+    juce::StringArray folders;
+    folders.addLines (AppPaths::scanFoldersFile().loadFileAsString());
+    folders.trim();
+    folders.removeEmptyStrings();
+    catalog.setExtraFolders (folders);
+}
+
+void MainComponent::saveScanFolders (const juce::StringArray& folders)
+{
+    catalog.setExtraFolders (folders);
+    AppPaths::scanFoldersFile().replaceWithText (catalog.getExtraFolders().joinIntoString ("\n"));
+}
+
+void MainComponent::showScanFolders()
+{
+    if (auto* w = foldersWindow.getComponent())
+    {
+        w->toFront (true);
+        return;
+    }
+
+    auto* panel = new juce::Component();
+    panel->setSize (560, 300);
+
+    auto* info = new juce::Label ({}, "Cartelle in piu' da battere nella scansione, una per riga. "
+                                      "Quelle standard del sistema sono gia' comprese.");
+    info->setJustificationType (juce::Justification::topLeft);
+    info->setBounds (12, 8, 536, 44);
+    panel->addAndMakeVisible (info);
+
+    auto* text = new juce::TextEditor();
+    text->setMultiLine (true, false);
+    text->setReturnKeyStartsNewLine (true);
+    text->setText (catalog.getExtraFolders().joinIntoString ("\n"));
+    text->setBounds (12, 56, 536, 170);
+    panel->addAndMakeVisible (text);
+
+    auto* add = new juce::TextButton ("AGGIUNGI CARTELLA...");
+    add->setBounds (12, 238, 220, 30);
+    add->onClick = [this, text]
+    {
+        chooser = std::make_unique<juce::FileChooser> ("Scegli una cartella di plugin");
+        chooser->launchAsync (juce::FileBrowserComponent::openMode
+                            | juce::FileBrowserComponent::canSelectDirectories,
+                              [text] (const juce::FileChooser& fc)
+        {
+            const auto dir = fc.getResult();
+            if (dir.isDirectory())
+                text->setText ((text->getText().trim() + "\n" + dir.getFullPathName()).trim());
+        });
+    };
+    panel->addAndMakeVisible (add);
+
+    auto* ok = new juce::TextButton ("SALVA");
+    ok->setBounds (438, 238, 110, 30);
+    ok->onClick = [this, text]
+    {
+        juce::StringArray folders;
+        folders.addLines (text->getText());
+        folders.trim();
+        folders.removeEmptyStrings();
+        saveScanFolders (folders);
+        statusMessage = "Cartelle salvate: " + juce::String (folders.size())
+                      + " in piu'. Rifai la scansione per rileggerle.";
+        if (auto* w = foldersWindow.getComponent())
+            w->exitModalState (0);
+    };
+    panel->addAndMakeVisible (ok);
+
+    juce::DialogWindow::LaunchOptions o;
+    o.content.setOwned (panel);
+    o.dialogTitle = "Cartelle dei plugin";
+    o.dialogBackgroundColour = juce::Colours::black;
+    o.useNativeTitleBar = true;
+    o.resizable = false;
+    foldersWindow = o.launchAsync();
+}
+
 void MainComponent::startScan()
 {
     if (catalog.isScanning())
         return;
 
-    statusMessage = "Scansione dei plugin in corso...";
+    statusMessage = "Scansione in corso su " + juce::String (catalog.foldersToScan().size()) + " cartelle...";
     scanButton.setEnabled (false);
 
     catalog.scanAsync ([safe = juce::Component::SafePointer<MainComponent> (this)] (int found, juce::StringArray failed)
@@ -162,6 +262,8 @@ void MainComponent::startScan()
 
 void MainComponent::startInitialScanIfNeeded (bool listFileExisted)
 {
+    loadScanFolders();
+
     if (! listFileExisted)
         startScan();
 }

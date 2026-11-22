@@ -26,6 +26,10 @@ private:
     void timerCallback() override;
     void showAudioSettings();
     void startScan();
+    void showScanMenu();
+    void showScanFolders();
+    void loadScanFolders();
+    void saveScanFolders (const juce::StringArray&);
     void refreshClockMenu();
     void tempoControlsChanged();
 
@@ -46,7 +50,8 @@ private:
     std::unique_ptr<PatchPanel> patchPanel;
 
     juce::String statusMessage;
-    juce::Component::SafePointer<juce::DialogWindow> audioSettingsWindow;
+    juce::Component::SafePointer<juce::DialogWindow> audioSettingsWindow, foldersWindow;
+    std::unique_ptr<juce::FileChooser> chooser;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
 };

@@ -1,0 +1,85 @@
+name: Push2 Test
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["push2-test-v*"]
+    paths:
+      - "tools/push2-test/**"
+      - "Assets/Fonts/**"
+      - ".github/workflows/push2-test.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: push2-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: App (macOS Intel x86_64)
+    runs-on: macos-15-intel
+    defaults:
+      run:
+        working-directory: tools/push2-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache dipendenze
+        uses: actions/cache@v4
+        with:
+          path: tools/push2-test/build/_deps
+          key: push2-deps-${{ runner.os }}-${{ hashFiles('tools/push2-test/CMakeLists.txt') }}
+
+      - name: Configura (x86_64, macOS 12+)
+        run: >
+          cmake -S . -B build -G Xcode
+          -DCMAKE_OSX_ARCHITECTURES=x86_64
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+
+      - name: Prove del protocollo
+        run: |
+          cmake --build build --target Push2ProtocolTests --config Release -- -quiet
+          ctest --test-dir build -C Release --output-on-failure
+
+      - name: Compila le app
+        run: |
+          cmake --build build --target MBStudio91Push2Test --config Release -- -quiet
+          cmake --build build --target MBStudio91Push2Viewer --config Release -- -quiet
+
+      - name: Verifica i due bundle
+        run: |
+          for NAME in "Test" "Viewer"; do
+            APP="build/MBStudio91Push2${NAME}_artefacts/Release/MBStudio91 Push2 ${NAME}.app"
+            BIN="$APP/Contents/MacOS/MBStudio91 Push2 ${NAME}"
+            ARCHS=$(lipo -archs "$BIN")
+            echo "$NAME: architetture $ARCHS"
+            test "$ARCHS" = "x86_64"
+            # libusb e' compilata dentro: non deve comparire tra le librerie esterne
+            if otool -L "$BIN" | grep -i libusb; then exit 1; fi
+            # l'icona deve essere nel bundle (JUCE la chiama AppIcon.icns)
+            ICNS=$(ls "$APP/Contents/Resources/"*.icns | head -1)
+            test -n "$ICNS"
+            echo "$NAME: $(basename "$ICNS"), $(/usr/libexec/PlistBuddy -c "Print :CFBundleIconFile" "$APP/Contents/Info.plist")"
+          done
+
+      - name: Crea lo zip con tutte e due le app
+        run: |
+          mkdir -p "$RUNNER_TEMP/pacchetto"
+          cp -R "build/MBStudio91Push2Test_artefacts/Release/MBStudio91 Push2 Test.app" "$RUNNER_TEMP/pacchetto/"
+          cp -R "build/MBStudio91Push2Viewer_artefacts/Release/MBStudio91 Push2 Viewer.app" "$RUNNER_TEMP/pacchetto/"
+          cp README.md "$RUNNER_TEMP/pacchetto/LEGGIMI.md"
+          ditto -c -k --keepParent "$RUNNER_TEMP/pacchetto" "$GITHUB_WORKSPACE/MBStudio91-Push2-Test-macOS-Intel.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MBStudio91-Push2-Test-macOS-Intel
+          path: MBStudio91-Push2-Test-macOS-Intel.zip
+
+      - name: Release (solo sui tag push2-test-v*)
+        if: startsWith(github.ref, 'refs/tags/push2-test-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: MBStudio91-Push2-Test-macOS-Intel.zip
