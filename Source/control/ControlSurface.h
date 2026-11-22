@@ -5,12 +5,14 @@
 #include <functional>
 
 // Azioni comuni a tutte le superfici di controllo (Launchpad Mini MK1, poi Push 2).
-enum class SurfaceActionType { none, patch, bank, mute, previous, next, tap, panicDown, panicUp, panic };
+enum class SurfaceActionType { none, patch, bank, mute, previous, next, tap, panicDown, panicUp, panic,
+                               stationVolume, masterVolume, tempoDelta };
 
 struct SurfaceAction
 {
     SurfaceActionType type = SurfaceActionType::none;
     int index = 0;
+    int delta = 0;   // encoder: scatti, positivi a destra
 };
 
 // Quello che una superficie deve mostrare.

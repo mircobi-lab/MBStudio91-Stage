@@ -28,6 +28,7 @@ set(STAGE_CORE_SOURCES
     Source/patches/Patch.cpp
     Source/patches/PatchManager.cpp
     Source/control/LaunchpadMapping.cpp
+    Source/control/Push2Mapping.cpp
     Source/control/LaunchpadController.cpp
     Source/control/SurfaceCoordinator.cpp
     Source/plugins/PluginCatalog.cpp
