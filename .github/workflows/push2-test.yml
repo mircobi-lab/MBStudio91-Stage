@@ -44,28 +44,34 @@ jobs:
           cmake --build build --target Push2ProtocolTests --config Release -- -quiet
           ctest --test-dir build -C Release --output-on-failure
 
-      - name: Compila l'app
-        run: cmake --build build --target MBStudio91Push2Test --config Release -- -quiet
-
-      - name: Verifica architettura
+      - name: Compila le app
         run: |
-          BIN="build/MBStudio91Push2Test_artefacts/Release/MBStudio91 Push2 Test.app/Contents/MacOS/MBStudio91 Push2 Test"
-          ARCHS=$(lipo -archs "$BIN")
-          echo "Architetture: $ARCHS"
-          test "$ARCHS" = "x86_64"
-          # libusb e' compilata dentro l'app: non deve comparire tra le librerie esterne
-          if otool -L "$BIN" | grep -i libusb; then exit 1; fi
-          # l'icona deve essere finita nel bundle (JUCE la chiama AppIcon.icns)
-          APP="build/MBStudio91Push2Test_artefacts/Release/MBStudio91 Push2 Test.app"
-          ICNS=$(ls "$APP/Contents/Resources/"*.icns | head -1)
-          test -n "$ICNS"
-          ls -la "$ICNS"
-          /usr/libexec/PlistBuddy -c "Print :CFBundleIconFile" "$APP/Contents/Info.plist"
+          cmake --build build --target MBStudio91Push2Test --config Release -- -quiet
+          cmake --build build --target MBStudio91Push2Viewer --config Release -- -quiet
 
-      - name: Crea lo zip
+      - name: Verifica i due bundle
         run: |
-          cd build/MBStudio91Push2Test_artefacts/Release
-          ditto -c -k --keepParent "MBStudio91 Push2 Test.app" "$GITHUB_WORKSPACE/MBStudio91-Push2-Test-macOS-Intel.zip"
+          for NAME in "Test" "Viewer"; do
+            APP="build/MBStudio91Push2${NAME}_artefacts/Release/MBStudio91 Push2 ${NAME}.app"
+            BIN="$APP/Contents/MacOS/MBStudio91 Push2 ${NAME}"
+            ARCHS=$(lipo -archs "$BIN")
+            echo "$NAME: architetture $ARCHS"
+            test "$ARCHS" = "x86_64"
+            # libusb e' compilata dentro: non deve comparire tra le librerie esterne
+            if otool -L "$BIN" | grep -i libusb; then exit 1; fi
+            # l'icona deve essere nel bundle (JUCE la chiama AppIcon.icns)
+            ICNS=$(ls "$APP/Contents/Resources/"*.icns | head -1)
+            test -n "$ICNS"
+            echo "$NAME: $(basename "$ICNS"), $(/usr/libexec/PlistBuddy -c "Print :CFBundleIconFile" "$APP/Contents/Info.plist")"
+          done
+
+      - name: Crea lo zip con tutte e due le app
+        run: |
+          mkdir -p "$RUNNER_TEMP/pacchetto"
+          cp -R "build/MBStudio91Push2Test_artefacts/Release/MBStudio91 Push2 Test.app" "$RUNNER_TEMP/pacchetto/"
+          cp -R "build/MBStudio91Push2Viewer_artefacts/Release/MBStudio91 Push2 Viewer.app" "$RUNNER_TEMP/pacchetto/"
+          cp README.md "$RUNNER_TEMP/pacchetto/LEGGIMI.md"
+          ditto -c -k --keepParent "$RUNNER_TEMP/pacchetto" "$GITHUB_WORKSPACE/MBStudio91-Push2-Test-macOS-Intel.zip"
 
       - uses: actions/upload-artifact@v4
         with:

@@ -71,6 +71,34 @@ target_compile_definitions(MBStudio91Push2Test PRIVATE
     JUCE_USE_CURL=0
     PUSH2TEST_VERSION="${PROJECT_VERSION}")
 
+# Visore: mostra il display del Push 2 ricevuto dalla rete, senza bisogno del Push
+juce_add_gui_app(MBStudio91Push2Viewer
+    PRODUCT_NAME "MBStudio91 Push2 Viewer"
+    COMPANY_NAME "MBStudio91"
+    BUNDLE_ID com.mbstudio91.push2viewer
+    VERSION ${PROJECT_VERSION}
+    ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/Assets/brand/icon.png"
+    NEEDS_CURL FALSE
+    NEEDS_WEB_BROWSER FALSE)
+
+target_sources(MBStudio91Push2Viewer PRIVATE
+    Source/ViewerMain.cpp
+    Source/ViewerComponent.cpp
+    Source/FrameServer.cpp)
+
+target_compile_definitions(MBStudio91Push2Viewer PRIVATE
+    JUCE_WEB_BROWSER=0
+    JUCE_USE_CURL=0
+    JUCE_DISPLAY_SPLASH_SCREEN=0
+    PUSH2TEST_VERSION="${PROJECT_VERSION}")
+
+target_link_libraries(MBStudio91Push2Viewer PRIVATE
+    push2_protocol
+    Push2TestAssets
+    juce::juce_gui_basics
+    juce::juce_recommended_config_flags
+    juce::juce_recommended_warning_flags)
+
 target_link_libraries(MBStudio91Push2Test PRIVATE
     push2_protocol
     Push2TestAssets

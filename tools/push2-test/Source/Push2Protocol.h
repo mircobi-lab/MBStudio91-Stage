@@ -33,6 +33,10 @@ std::vector<std::uint8_t> encodeFrame (const std::uint8_t* rgb, int width, int h
 // Un pixel RGB -> 16 bit nel formato del Push 2 (blu nei bit alti, rosso nei bassi)
 std::uint16_t packPixel (std::uint8_t r, std::uint8_t g, std::uint8_t b);
 
+// Inverso di encodeFrame: dal frame del Push a RGB 8 bit, righe di displayWidth*3 byte.
+// Vuoto se il frame non ha la misura giusta.
+std::vector<std::uint8_t> decodeFrame (const std::uint8_t* frame, int size);
+
 // ---------------------------------------------------------------- MIDI
 // Pad: riga 0 = in alto (92..99), riga 7 = in basso (36..43); colonna 0 = sinistra
 int padNote (int row, int column);

@@ -59,6 +59,34 @@ std::vector<std::uint8_t> encodeFrame (const std::uint8_t* rgb, int width, int h
     return frame;
 }
 
+std::vector<std::uint8_t> decodeFrame (const std::uint8_t* frame, int size)
+{
+    if (frame == nullptr || size < frameBytes)
+        return {};
+
+    std::vector<std::uint8_t> rgb ((std::size_t) displayWidth * displayHeight * 3, 0);
+
+    for (int y = 0; y < displayHeight; ++y)
+    {
+        const std::uint8_t* src = frame + (std::size_t) y * lineBytes;
+        std::uint8_t* dst = rgb.data() + (std::size_t) y * displayWidth * 3;
+
+        for (int x = 0; x < displayWidth; ++x)
+        {
+            // le righe sono multiple di 4, quindi il pattern riparte uguale a ogni riga
+            const auto lo = (std::uint8_t) (src[x * 2]     ^ xorPattern[(x * 2) % 4]);
+            const auto hi = (std::uint8_t) (src[x * 2 + 1] ^ xorPattern[(x * 2 + 1) % 4]);
+            const auto p = (std::uint16_t) (lo | (hi << 8));
+
+            const int r5 = p & 0x1F, g6 = (p >> 5) & 0x3F, b5 = p >> 11;
+            dst[x * 3]     = (std::uint8_t) ((r5 << 3) | (r5 >> 2));
+            dst[x * 3 + 1] = (std::uint8_t) ((g6 << 2) | (g6 >> 4));
+            dst[x * 3 + 2] = (std::uint8_t) ((b5 << 3) | (b5 >> 2));
+        }
+    }
+    return rgb;
+}
+
 int padNote (int row, int column)
 {
     return 92 - row * 8 + column;

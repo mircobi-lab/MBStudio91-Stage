@@ -3,6 +3,9 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <algorithm>
+#include <cmath>
+#include <vector>
 
 static int failures = 0;
 
@@ -93,6 +96,26 @@ int main()
     CHECK (frame[0] == (0x1F ^ 0xE7) && frame[1] == (0x00 ^ 0xF3));
     CHECK (frame[2] == 0xE7 && frame[3] == 0xFF); // pixel nero = solo il pattern
     CHECK (frame[lineBytes] == 0xE7);             // inizio riga 2, il pattern riparte
+
+    // Giro completo: codifica e ridecodifica devono riportare gli stessi colori,
+    // a meno della perdita del 16 bit (al massimo 7 per canale)
+    {
+        std::vector<std::uint8_t> src ((std::size_t) displayWidth * displayHeight * 3);
+        for (std::size_t i = 0; i < src.size(); ++i)
+            src[i] = (std::uint8_t) ((i * 37 + (i / 97)) & 0xFF);
+
+        const auto enc = encodeFrame (src.data(), displayWidth, displayHeight, displayWidth * 3);
+        const auto dec = decodeFrame (enc.data(), (int) enc.size());
+        CHECK (dec.size() == src.size());
+
+        int worst = 0;
+        for (std::size_t i = 0; i < src.size() && i < dec.size(); ++i)
+            worst = std::max (worst, std::abs ((int) src[i] - (int) dec[i]));
+        CHECK (worst <= 7);
+
+        CHECK (decodeFrame (enc.data(), 10).empty()); // frame corto: niente
+        CHECK (decodeFrame (nullptr, 0).empty());
+    }
 
     if (failures == 0)
         std::printf ("Tutte le prove passate\n");

@@ -44,15 +44,25 @@ della palette colori le legge dal Push e le rimette a posto quando chiudi l'app.
 
 ## Display senza il Push collegato
 
-Se il Push non c'e' o Live tiene occupata l'interfaccia, l'app prova il simulatore
-[push-simulator](https://github.com/yonkolevel/push-simulator) sulla porta
-127.0.0.1:48484 e gli manda lo stesso frame preceduto da `PSMF` e dalla lunghezza su
-4 byte, come si aspetta il suo `display_feed.go`. Li' il frame parte solo quando
-cambia, mentre al display vero va rimandato sempre. Se il Push si ripresenta, entro
-cinque secondi l'app torna sull'USB e lascia il socket.
+Nello stesso pacchetto c'e' **MBStudio91 Push2 Viewer**: ascolta su 127.0.0.1:48484 e
+mostra il display del Push a grandezza naturale, dentro un telaio in stile MBStudio con
+il LED di stato e il conteggio dei frame. Apri prima il visore, poi il test: se il Push
+non c'e' o Live tiene occupata l'interfaccia USB, il test gli manda i frame e vedi il
+display sullo schermo.
 
-La porta si cambia con `PUSH_SIM_DISPLAY_FEED_PORT`, lo stesso nome che legge il
-simulatore. In finestra la riga Display dice quale dei due sta usando.
+Il formato sul filo e' lo stesso di
+[push-simulator](https://github.com/yonkolevel/push-simulator) (`PSMF`, poi la lunghezza
+su 4 byte, poi il frame), quindi il test funziona anche con quello al posto del visore.
+Attenzione: quel repository non ha un file di licenza, percio' va bene usarlo per se'
+ma non ridistribuirne una copia compilata. Il visore qui dentro e' codice del progetto,
+senza quel problema.
+
+Sul simulatore o sul visore il frame parte solo quando cambia; al display vero va
+rimandato sempre, perche' si spegne dopo due secondi di silenzio. Se il Push si
+ripresenta, entro cinque secondi il test torna sull'USB e lascia il socket.
+
+La porta si cambia con `PUSH_SIM_DISPLAY_FEED_PORT`, letta da tutte e due le app. In
+finestra la riga Display dice quale strada sta usando il test.
 
 ## Come usarla
 
