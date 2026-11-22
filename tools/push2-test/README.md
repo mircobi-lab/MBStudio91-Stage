@@ -45,7 +45,7 @@ della palette colori le legge dal Push e le rimette a posto quando chiudi l'app.
 ## Display senza il Push collegato
 
 Se il Push non c'e' o Live tiene occupata l'interfaccia, l'app prova il simulatore
-[push-simulator](https://github.com/ricardoabreu/push-simulator) sulla porta
+[push-simulator](https://github.com/yonkolevel/push-simulator) sulla porta
 127.0.0.1:48484 e gli manda lo stesso frame preceduto da `PSMF` e dalla lunghezza su
 4 byte, come si aspetta il suo `display_feed.go`. Li' il frame parte solo quando
 cambia, mentre al display vero va rimandato sempre. Se il Push si ripresenta, entro
