@@ -31,7 +31,9 @@ Il progetto è descritto in `docs/superpowers/specs/2026-11-21-mbstudio91-stage-
 - Tempo globale: INT (BPM a mano o TAP) oppure EXT (MIDI clock da un ingresso scelto in CLOCK DA). Arpeggiatori e delay a tempo dei plugin lo seguono.
 - Limitatore di sicurezza sull'uscita a −1 dB.
 
-Il prossimo passo è il supporto di Ableton Push 2 (pad colorati, pulsanti, manopole e schermo).
+## Cosa aggiunge la Fase 4
+
+L'Ableton Push 2 come seconda superficie, accanto alla Launchpad: pad colorati per le patch, tasti per i banchi, rotativi sui volumi e sul tempo, e il display da 960x160 con nome della patch, postazioni e BPM. Le due superfici funzionano insieme.
 
 ## Scaricare l'app
 
@@ -65,6 +67,9 @@ Il Push 2 funziona come la Launchpad, da selettore di patch, e in piu' ha il dis
 | 8 tasti sopra il display | i banchi A-H |
 | colonna a destra, dall'alto | mute delle quattro postazioni, patch precedente, successiva, TAP, PANIC |
 | PANIC | si tiene premuto mezzo secondo |
+| i primi 4 rotativi sopra il display | volume delle quattro postazioni, mezzo decibel a scatto |
+| rotativo del master | volume generale |
+| rotativo del tempo | BPM, solo in tempo libero: col clock esterno non tocca niente |
 | display | nome della patch, banco, numero, BPM e mute delle postazioni |
 
 Stage apre la porta **User** del Push se c'e': e' quella che Live lascia libera, cosi'

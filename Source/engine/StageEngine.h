@@ -27,6 +27,7 @@ public:
 
     void panicAll();
     void setMasterGainDb (float);
+    float getMasterGainDb() const;
 
     double getSampleRate() const;
     int getBlockSize() const;

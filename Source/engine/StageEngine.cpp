@@ -136,6 +136,7 @@ void StageEngine::panicAll()
 }
 
 void StageEngine::setMasterGainDb (float db) { masterTarget = juce::Decibels::decibelsToGain (db); }
+float StageEngine::getMasterGainDb() const { return juce::Decibels::gainToDecibels (masterTarget.load(), -60.0f); }
 double StageEngine::getSampleRate() const   { return currentSampleRate; }
 int StageEngine::getBlockSize() const       { return currentBlockSize; }
 

@@ -1,5 +1,11 @@
 #include "SurfaceCoordinator.h"
 
+namespace
+{
+    constexpr float dbPerClick = 0.5f;      // mezzo decibel a scatto del rotativo
+    constexpr float minVolumeDb = -60.0f, maxVolumeDb = 6.0f;
+}
+
 SurfaceCoordinator::SurfaceCoordinator (StageEngine& e, Library& l, PatchManager& p, bool runTimer)
     : engine (e), library (l), patches (p)
 {
@@ -84,6 +90,26 @@ void SurfaceCoordinator::handleAction (SurfaceAction a)
 
         case SurfaceActionType::panic:
             engine.panicAll();
+            break;
+
+        case SurfaceActionType::stationVolume:
+            if (juce::isPositiveAndBelow (a.index, StageEngine::numStations))
+            {
+                auto& st = engine.station (a.index);
+                st.setGainDb (juce::jlimit (minVolumeDb, maxVolumeDb, st.getGainDb() + a.delta * dbPerClick));
+                patches.markModified();
+            }
+            break;
+
+        case SurfaceActionType::masterVolume:
+            engine.setMasterGainDb (juce::jlimit (minVolumeDb, maxVolumeDb,
+                                                  engine.getMasterGainDb() + a.delta * dbPerClick));
+            break;
+
+        case SurfaceActionType::tempoDelta:
+            // Col clock esterno il tempo lo detta la drum machine: il rotativo non tocca niente.
+            if (engine.tempo().getSource() == TempoTracker::Source::internal)
+                engine.tempo().setBpm (engine.tempo().getBpm() + a.delta);
             break;
 
         case SurfaceActionType::none:

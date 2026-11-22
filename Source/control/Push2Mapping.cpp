@@ -116,12 +116,35 @@ namespace Push2Mapping
         return -1;
     }
 
+    // I rotativi mandano un valore relativo in complemento a due: 0 vuol dire fermo.
+    SurfaceAction encoderAction (int cc, int value)
+    {
+        const int delta = push2::encoderDelta (value);
+        if (delta == 0)
+            return {};
+
+        if (cc >= push2::trackEncoderCC && cc < push2::trackEncoderCC + push2::numTrackEncoders)
+        {
+            const int index = cc - push2::trackEncoderCC;
+            // I primi quattro sulle postazioni; gli altri restano liberi per una fase successiva.
+            return index < 4 ? SurfaceAction { SurfaceActionType::stationVolume, index, delta }
+                             : SurfaceAction {};
+        }
+
+        if (cc == push2::masterEncoderCC) return { SurfaceActionType::masterVolume, 0, delta };
+        if (cc == push2::tempoEncoderCC)  return { SurfaceActionType::tempoDelta, 0, delta };
+        return {};
+    }
+
     SurfaceAction decode (const juce::MidiMessage& m)
     {
         if (m.isController())
         {
             const int cc = m.getControllerNumber();
             const bool pressed = m.getControllerValue() > 0;
+
+            if (const auto enc = encoderAction (cc, m.getControllerValue()); enc.type != SurfaceActionType::none)
+                return enc;
 
             if (cc == push2::sceneButtonCC (7))
                 return { pressed ? SurfaceActionType::panicDown : SurfaceActionType::panicUp, 0 };
