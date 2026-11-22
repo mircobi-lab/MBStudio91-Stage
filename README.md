@@ -149,6 +149,17 @@ Su Linux, dove i test girano volentieri, libusb vuole `libudev` che spesso non c
 in quel caso aggiungi `-DLIBUSB_ENABLE_UDEV=OFF` al comando di configurazione. Su
 macOS non serve, perche' libusb usa il suo backend Darwin.
 
+## Icona
+
+L'icona dell'app sta in `Assets/brand/icon.png` e la genera
+`Assets/brand/make_icon.py` (serve Pillow): telaio nero con angoli alla macOS,
+il marchio stampato nel display incassato e le quattro postazioni, ognuna col
+suo LED e la barra del volume. Per rifarla dopo una modifica:
+
+```
+python3 Assets/brand/make_icon.py
+```
+
 ## Licenze
 
 Basato su [JUCE](https://juce.com) 8. Il font Bebas Neue (Dharma Type) è distribuito con licenza SIL Open Font License 1.1, testo in `Assets/Fonts/OFL.txt`.

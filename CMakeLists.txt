@@ -76,7 +76,8 @@ juce_add_gui_app(MBStudio91Stage
     VERSION ${PROJECT_VERSION}
     MICROPHONE_PERMISSION_ENABLED FALSE
     NEEDS_CURL FALSE
-    NEEDS_WEB_BROWSER FALSE)
+    NEEDS_WEB_BROWSER FALSE
+    ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/Assets/brand/icon.png")
 
 juce_add_binary_data(StageAssets SOURCES Assets/Fonts/BebasNeue-Regular.ttf)
 

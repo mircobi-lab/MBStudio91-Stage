@@ -57,12 +57,17 @@ jobs:
       - name: Compila l'app
         run: cmake --build build --target MBStudio91Stage --config Release -- -quiet
 
-      - name: Verifica architettura
+      - name: Verifica architettura e icona
         run: |
-          BIN="build/MBStudio91Stage_artefacts/Release/MBStudio91 Stage.app/Contents/MacOS/MBStudio91 Stage"
+          APP="build/MBStudio91Stage_artefacts/Release/MBStudio91 Stage.app"
+          BIN="$APP/Contents/MacOS/MBStudio91 Stage"
           ARCHS=$(lipo -archs "$BIN")
           echo "Architetture: $ARCHS"
           test "$ARCHS" = "x86_64"
+          # l'icona deve essere nel bundle (JUCE la chiama AppIcon.icns)
+          ICNS=$(ls "$APP/Contents/Resources/"*.icns | head -1)
+          test -n "$ICNS"
+          echo "Icona: $(basename "$ICNS"), $(/usr/libexec/PlistBuddy -c "Print :CFBundleIconFile" "$APP/Contents/Info.plist")"
 
       - name: Crea lo zip
         run: |
