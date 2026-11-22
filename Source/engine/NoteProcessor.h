@@ -15,6 +15,7 @@ struct KeyZone
     VelocityCurve curve = VelocityCurve::lineare;
     float customGamma = 1.0f;          // 0.3..3.0, solo con la curva personalizzata
     bool faderControlsVolume = false;  // CC7 della tastiera = volume della postazione
+    bool volumeLocked = false;         // LOCK: il volume non si muove piu', da nessuna parte
 
     juce::ValueTree toValueTree() const;
     static KeyZone fromValueTree (const juce::ValueTree&);

@@ -64,7 +64,7 @@ StationPanel::StationPanel (StageEngine& e, PluginCatalog& c, int i)
     title.setFont (StageLookAndFeel::titleFont (26.0f));
     addAndMakeVisible (title);
 
-    deviceLabel.setFont (StageLookAndFeel::titleFont (18.0f));
+    deviceLabel.setFont (StageLookAndFeel::titleFont (13.0f));
     addAndMakeVisible (deviceLabel);
 
     assignButton.onClick = [this] { assignClicked(); };
@@ -97,6 +97,11 @@ StationPanel::StationPanel (StageEngine& e, PluginCatalog& c, int i)
     faderButton.setClickingTogglesState (true);
     faderButton.onClick = [this] { zoneControlChanged(); };
     addAndMakeVisible (faderButton);
+
+    // LOCK: il volume resta dov'e', ne' con la manopola ne' col fader della tastiera
+    lockButton.setClickingTogglesState (true);
+    lockButton.onClick = [this] { zoneControlChanged(); };
+    addAndMakeVisible (lockButton);
 
     setupIncDec (transpose, -48.0, 48.0);
     transpose.textFromValueFunction = [] (double v) { return (v > 0 ? "+" : "") + juce::String ((int) v); };
@@ -188,10 +193,12 @@ void StationPanel::resized()
     auto vol = r.removeFromTop (120);
     auto buttons = vol.removeFromRight (120);
     volume.setBounds (vol);
-    buttons.removeFromTop (14);
-    muteButton.setBounds (buttons.removeFromTop (36).reduced (2));
-    buttons.removeFromTop (8);
-    faderButton.setBounds (buttons.removeFromTop (36).reduced (2));
+    buttons.removeFromTop (6);
+    muteButton.setBounds (buttons.removeFromTop (32).reduced (2));
+    buttons.removeFromTop (6);
+    faderButton.setBounds (buttons.removeFromTop (32).reduced (2));
+    buttons.removeFromTop (6);
+    lockButton.setBounds (buttons.removeFromTop (32).reduced (2));
     r.removeFromTop (6);
 
     auto row = [&r] (juce::Label& l, juce::Component& c)
@@ -220,6 +227,8 @@ void StationPanel::loadZoneIntoControls()
     curveMenu.setSelectedId ((int) z.curve + 1, juce::dontSendNotification);
     gamma.setValue (z.customGamma, juce::dontSendNotification);
     faderButton.setToggleState (z.faderControlsVolume, juce::dontSendNotification);
+    lockButton.setToggleState (z.volumeLocked, juce::dontSendNotification);
+    volume.setEnabled (! z.volumeLocked);
 
     const bool custom = z.curve == VelocityCurve::personalizzata;
     gamma.setVisible (custom);
@@ -240,6 +249,8 @@ void StationPanel::zoneControlChanged()
     z.curve = (VelocityCurve) juce::jlimit (0, 3, curveMenu.getSelectedId() - 1);
     z.customGamma = (float) gamma.getValue();
     z.faderControlsVolume = faderButton.getToggleState();
+    z.volumeLocked = lockButton.getToggleState();
+    volume.setEnabled (! z.volumeLocked);
 
     engine.setZone (index, z);
     engine.saveKeyboardSettings();
@@ -393,8 +404,8 @@ void StationPanel::timerCallback()
     const bool connected = engine.isStationDeviceConnected (index);
     title.setText (stationLabel(), juce::dontSendNotification);
     deviceLabel.setText (a.has_value() ? a->deviceName.toUpperCase() : "NESSUNA TASTIERA", juce::dontSendNotification);
-    deviceLabel.setColour (juce::Label::textColourId, connected || ! a.has_value() ? juce::Colours::white
-                                                                                    : juce::Colours::grey);
+    deviceLabel.setColour (juce::Label::textColourId, connected || ! a.has_value() ? juce::Colour (0xff9b9da2)
+                                                                                    : juce::Colour (0xff55575a));
 
     // LED: spento = nessuna tastiera o scollegata, verde = collegata, bianco = sta arrivando MIDI
     const auto now = juce::Time::getMillisecondCounter();

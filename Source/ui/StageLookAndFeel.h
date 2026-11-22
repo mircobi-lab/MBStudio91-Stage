@@ -15,6 +15,11 @@ public:
     juce::Typeface::Ptr getTypefaceForFont (const juce::Font&) override;
     static juce::Font titleFont (float height);
 
+    // Manopola come sul pannello: scala a tacche serigrafata, maggiori ogni 25%,
+    // cappuccio nero con la linea bianca. Spenta quando il controllo e' bloccato.
+    void drawRotarySlider (juce::Graphics&, int x, int y, int width, int height, float sliderPos,
+                           float rotaryStartAngle, float rotaryEndAngle, juce::Slider&) override;
+
 private:
     juce::Typeface::Ptr bebas;
 };
