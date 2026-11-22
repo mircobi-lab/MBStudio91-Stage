@@ -190,8 +190,10 @@ public:
         {
             StageEngine e;
             withTwoFakes (e);
+            e.station (0).setGainDb (-6.0206f);   // sotto la soglia del limitatore
+            e.station (1).setGainDb (-6.0206f);
             e.injectMidiForTest (1, noteOn());
-            expectWithinAbsoluteError (render (e, noteOn()), 1.0f, 1.0e-4f);
+            expectWithinAbsoluteError (render (e, noteOn(), 10), 0.5f, 1.0e-3f);
         }
 
         beginTest ("il buffer d'uscita viene azzerato prima del mix");
@@ -235,6 +237,24 @@ public:
             const auto changes = StageEngine::planMidiInputChanges (enabled, available);
             expect (changes.toDisable == juce::StringArray { "launchkey61", "minimk1" });
             expect (changes.toOpen == juce::StringArray { "keystation", "minimk2" });
+        }
+
+        beginTest ("il limitatore tiene l'uscita sotto 0 dB");
+        {
+            StageEngine e;
+            withTwoFakes (e);
+            e.setMasterGainDb (12.0f);
+            e.injectMidiForTest (1, noteOn());
+            render (e, noteOn(), 40);   // 2 x 0.5 = 1.0, +12 dB = 4.0 senza limitatore
+            juce::AudioBuffer<float> out (2, blockSize);
+            float peak = 0.0f;
+            for (int i = 0; i < 20; ++i)
+            {
+                e.renderBlock (out);
+                peak = juce::jmax (peak, out.getMagnitude (0, blockSize));
+            }
+            expect (peak <= 0.95f, "picco " + juce::String (peak));
+            expect (peak > 0.5f);
         }
 
         beginTest ("i dispositivi Launchpad non suonano le postazioni");

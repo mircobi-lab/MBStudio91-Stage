@@ -78,11 +78,11 @@ StationPanel::StationPanel (StageEngine& e, PluginCatalog& c, int i)
     volume.setTextValueSuffix (" dB");
     volume.setDoubleClickReturnValue (true, 0.0);
     volume.setValue (station.getGainDb(), juce::dontSendNotification);
-    volume.onValueChange = [this] { station.setGainDb ((float) volume.getValue()); };
+    volume.onValueChange = [this] { station.setGainDb ((float) volume.getValue()); if (onUserEdit) onUserEdit(); };
     addAndMakeVisible (volume);
 
     muteButton.setClickingTogglesState (true);
-    muteButton.onClick = [this] { station.setMuted (muteButton.getToggleState()); };
+    muteButton.onClick = [this] { station.setMuted (muteButton.getToggleState()); if (onUserEdit) onUserEdit(); };
     addAndMakeVisible (muteButton);
 
     faderButton.setClickingTogglesState (true);
@@ -234,6 +234,8 @@ void StationPanel::zoneControlChanged()
 
     engine.setZone (index, z);
     engine.saveKeyboardSettings();
+    if (onUserEdit)
+        onUserEdit();
 
     const bool custom = z.curve == VelocityCurve::personalizzata;
     gamma.setVisible (custom);
@@ -250,6 +252,14 @@ void StationPanel::assignClicked()
 }
 
 //==============================================================================
+void StationPanel::refreshFromEngine()
+{
+    loadZoneIntoControls();
+    refreshPluginMenus();
+    muteButton.setToggleState (station.isMuted(), juce::dontSendNotification);
+    volume.setValue (station.getGainDb(), juce::dontSendNotification);
+}
+
 void StationPanel::refreshPluginMenus()
 {
     instrumentTypes.clear();
@@ -290,6 +300,9 @@ juce::AudioPluginInstance* StationPanel::instanceInSlot (int slot) const
 
 void StationPanel::slotChosen (int slot)
 {
+    if (onUserEdit)
+        onUserEdit();
+
     const int id = slotMenus[(size_t) slot].getSelectedId();
     const auto& list = slot == 0 ? instrumentTypes : effectTypes;
 
@@ -298,7 +311,6 @@ void StationPanel::slotChosen (int slot)
         if (slot == 0) station.setInstrument (nullptr);
         else           station.setEffect (slot - 1, nullptr);
         station.setLoadError ({});
-        engine.saveKeyboardSettings();   // cosi' al prossimo avvio la postazione torna com'e' adesso
         return;
     }
 
@@ -328,7 +340,6 @@ void StationPanel::slotChosen (int slot)
             if (slot == 0) self->station.setInstrument (std::move (inst));
             else           self->station.setEffect (slot - 1, std::move (inst));
             self->station.setLoadError ({});
-            self->engine.saveKeyboardSettings();
         });
 }
 
@@ -392,6 +403,7 @@ void StationPanel::timerCallback()
         volume.setValue (station.getGainDb(), juce::dontSendNotification);
 
     errorLabel.setText (station.getLoadError(), juce::dontSendNotification);
+    muteButton.setToggleState (station.isMuted(), juce::dontSendNotification);   // anche dalla Launchpad
 
     for (int s = 0; s < numSlots; ++s)
         openButtons[(size_t) s].setEnabled (instanceInSlot (s) != nullptr);

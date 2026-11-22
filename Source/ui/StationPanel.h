@@ -17,7 +17,9 @@ public:
     void resized() override;
 
     void refreshPluginMenus();
+    void refreshFromEngine();                              // dopo il richiamo di una patch
     std::function<void (const juce::String&)> onStatus;   // messaggi per la riga di stato
+    std::function<void()> onUserEdit;                      // l'utente ha cambiato qualcosa: patch modificata
 
 private:
     static constexpr int numSlots = 1 + Station::maxEffects;   // slot 0 = strumento

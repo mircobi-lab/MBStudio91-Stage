@@ -1,5 +1,8 @@
 #include <juce_gui_extra/juce_gui_extra.h>
+#include "control/LaunchpadController.h"
+#include "control/SurfaceCoordinator.h"
 #include "engine/StageEngine.h"
+#include "patches/PatchManager.h"
 #include "plugins/PluginCatalog.h"
 #include "plugins/ScannerProcess.h"
 #include "settings/AppPaths.h"
@@ -26,18 +29,64 @@ public:
         catalog->load();
 
         engine = std::make_unique<StageEngine>();
-        engine->start();
         engine->loadKeyboardSettings();
+        engine->start();
 
-        auto content = std::make_unique<MainComponent> (*engine, *catalog);
+        // Libreria delle patch, con una copia di sicurezza al giorno.
+        const auto libFile = AppPaths::libraryFile();
+        juce::String libraryWarning;
+        if (libFile.existsAsFile())
+        {
+            if (library.loadFrom (libFile))
+            {
+                const auto backup = Library::dailyBackupFor (libFile, juce::Time::getCurrentTime());
+                if (! backup.existsAsFile())
+                    libFile.copyFileTo (backup);
+            }
+            else
+            {
+                // Il file illeggibile non viene sovrascritto: si sposta da parte e lo si dice.
+                const auto moved = Library::setAsideUnreadable (libFile);
+                libraryWarning = "La libreria delle patch non si e' potuta leggere ed e' stata messa da parte come\n"
+                               + (moved != juce::File() ? moved.getFullPathName() : libFile.getFullPathName())
+                               + "\n\nNella stessa cartella ci sono le copie giornaliere (libreria-AAAA-MM-GG.xml): "
+                                 "per recuperarne una, chiudi l'app e rinominala libreria.xml.";
+            }
+        }
+
+        patches = std::make_unique<PatchManager> (*engine, library,
+            [this] (const juce::String& id, double sr, int bs, PatchManager::LoadCallback cb)
+            {
+                if (const auto desc = catalog->findByPortableId (id))
+                    catalog->createInstanceAsync (*desc, sr, bs, std::move (cb));
+                else
+                    cb (nullptr, "Plugin non installato: " + id.fromFirstOccurrenceOf ("|", false, false)
+                                                              .fromFirstOccurrenceOf ("|", false, false)
+                                                              .upToFirstOccurrenceOf ("|", false, false));
+            });
+
+        coordinator = std::make_unique<SurfaceCoordinator> (*engine, library, *patches);
+        launchpad = std::make_unique<LaunchpadController>();
+        coordinator->addSurface (*launchpad);
+
+        auto content = std::make_unique<MainComponent> (*engine, *catalog, *patches, library, *coordinator);
+        content->onLibraryChanged = [this] { saveLibrary(); };
         auto* contentPtr = content.get();
         mainWindow = std::make_unique<MainWindow> (getApplicationName(), std::move (content));
         contentPtr->startInitialScanIfNeeded (listExisted);
+
+        if (libraryWarning.isNotEmpty())
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "Libreria delle patch", libraryWarning);
     }
 
     void shutdown() override
     {
         mainWindow = nullptr;   // chiude prima le finestre dei plugin
+        coordinator = nullptr;
+        launchpad = nullptr;
+        if (patches != nullptr)
+            saveLibrary();
+        patches = nullptr;
         if (engine != nullptr)
         {
             engine->saveKeyboardSettings();
@@ -54,6 +103,8 @@ public:
     void systemRequestedQuit() override { quit(); }
 
 private:
+    void saveLibrary() { library.saveTo (AppPaths::libraryFile()); }
+
     class MainWindow final : public juce::DocumentWindow
     {
     public:
@@ -71,8 +122,12 @@ private:
     };
 
     StageLookAndFeel lookAndFeel;
+    Library library;
     std::unique_ptr<PluginCatalog> catalog;
     std::unique_ptr<StageEngine> engine;
+    std::unique_ptr<PatchManager> patches;
+    std::unique_ptr<LaunchpadController> launchpad;
+    std::unique_ptr<SurfaceCoordinator> coordinator;
     std::unique_ptr<MainWindow> mainWindow;
 };
 

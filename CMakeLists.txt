@@ -21,10 +21,15 @@ set(STAGE_CORE_SOURCES
     Source/engine/NoteTracker.cpp
     Source/engine/MidiPanic.cpp
     Source/engine/Station.cpp
-    Source/engine/StationState.cpp
     Source/engine/StageEngine.cpp
     Source/engine/NoteProcessor.cpp
     Source/engine/KeyboardRouter.cpp
+    Source/engine/TempoTracker.cpp
+    Source/patches/Patch.cpp
+    Source/patches/PatchManager.cpp
+    Source/control/LaunchpadMapping.cpp
+    Source/control/LaunchpadController.cpp
+    Source/control/SurfaceCoordinator.cpp
     Source/plugins/PluginCatalog.cpp
     Source/plugins/ScannerProcess.cpp
 )
@@ -64,6 +69,7 @@ target_sources(MBStudio91Stage PRIVATE
     Source/Main.cpp
     Source/ui/MainComponent.cpp
     Source/ui/StationPanel.cpp
+    Source/ui/PatchPanel.cpp
     Source/ui/StageLookAndFeel.cpp
     ${STAGE_CORE_SOURCES})
 

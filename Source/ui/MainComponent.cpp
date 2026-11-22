@@ -2,26 +2,47 @@
 #include "StageLookAndFeel.h"
 #include "settings/AppPaths.h"
 
-MainComponent::MainComponent (StageEngine& e, PluginCatalog& c)
-    : engine (e), catalog (c)
+MainComponent::MainComponent (StageEngine& e, PluginCatalog& c, PatchManager& pm, Library& lib, SurfaceCoordinator& sc)
+    : engine (e), catalog (c), patches (pm), coordinator (sc)
 {
+    // Tempo: INT/EXT, BPM, TAP, sorgente del clock
+    tempoSourceButton.setClickingTogglesState (true);
+    tempoSourceButton.onClick = [this] { tempoControlsChanged(); };
+    bpm.setRange (20.0, 300.0, 0.1);
+    bpm.setIncDecButtonsMode (juce::Slider::incDecButtonsDraggable_Vertical);
+    bpm.setTextBoxStyle (juce::Slider::TextBoxLeft, false, 70, 30);
+    bpm.setTextValueSuffix (" BPM");
+    bpm.onValueChange = [this] { engine.tempo().setBpm (bpm.getValue()); engine.saveKeyboardSettings(); };
+    tapButton.onClick = [this] { coordinator.handleTap (juce::Time::getMillisecondCounterHiRes() * 0.001); };
+    clockMenu.onChange = [this] { tempoControlsChanged(); };
+    clockLost.setColour (juce::Label::textColourId, StageLookAndFeel::panicRed.brighter (0.3f));
+    for (auto* comp : std::initializer_list<juce::Component*> { &tempoSourceButton, &bpm, &tapButton, &clockLabel, &clockMenu, &clockLost })
+        addAndMakeVisible (comp);
+    tempoSourceButton.setToggleState (engine.tempo().getSource() == TempoTracker::Source::external, juce::dontSendNotification);
+    refreshClockMenu();
+    midiDevicesChanged = juce::MidiDeviceListConnection::make ([this] { refreshClockMenu(); });
+
+    patchPanel = std::make_unique<PatchPanel> (pm, lib);
+    patchPanel->onLibraryChanged = [this] { if (onLibraryChanged) onLibraryChanged(); };
+    addAndMakeVisible (*patchPanel);
+
     title.setText ("MBSTUDIO91(TM) STAGE", juce::dontSendNotification);
     title.setFont (StageLookAndFeel::titleFont (34.0f));
     addAndMakeVisible (title);
 
-    for (auto* b : { &audioButton, &foldersButton, &scanButton, &panicButton })
+    for (auto* b : { &audioButton, &scanButton, &panicButton })
         addAndMakeVisible (*b);
 
     panicButton.setColour (juce::TextButton::buttonColourId, StageLookAndFeel::panicRed);
     panicButton.onClick = [this] { engine.panicAll(); };
     audioButton.onClick = [this] { showAudioSettings(); };
-    scanButton.onClick  = [this] { startScan(); };
-    foldersButton.onClick = [this] { showScanFolders(); };
+    scanButton.onClick  = [this] { showScanMenu(); };
 
     for (int i = 0; i < StageEngine::numStations; ++i)
     {
         panels[(size_t) i] = std::make_unique<StationPanel> (engine, catalog, i);
         panels[(size_t) i]->onStatus = [this] (const juce::String& s) { statusMessage = s; };
+        panels[(size_t) i]->onUserEdit = [this] { patches.markModified(); };
         addAndMakeVisible (*panels[(size_t) i]);
     }
 
@@ -34,7 +55,16 @@ MainComponent::MainComponent (StageEngine& e, PluginCatalog& c)
     statusLabel.setJustificationType (juce::Justification::centredLeft);
     addAndMakeVisible (statusLabel);
 
-    setSize (1400, 820);
+    // Dopo un richiamo le postazioni mostrano i valori della patch.
+    patches.onStateChanged = [this]
+    {
+        for (auto& p : panels)
+            p->refreshFromEngine();
+        if (patchPanel != nullptr)
+            patchPanel->repaint();
+    };
+
+    setSize (1600, 900);
     startTimerHz (4);
 }
 
@@ -42,6 +72,7 @@ MainComponent::~MainComponent()
 {
     stopTimer();
     engine.onLearnFinished = nullptr;
+    patches.onStateChanged = nullptr;
     // Il dialog va chiuso prima che il motore (e il suo AudioDeviceManager) venga distrutto.
     if (auto* w = audioSettingsWindow.getComponent())
         delete w;
@@ -59,18 +90,27 @@ void MainComponent::resized()
     auto r = getLocalBounds().reduced (16);
 
     auto top = r.removeFromTop (50);
-    panicButton.setBounds (top.removeFromRight (140).reduced (2));
-    top.removeFromRight (10);
-    scanButton.setBounds (top.removeFromRight (190).reduced (2));
-    top.removeFromRight (10);
-    foldersButton.setBounds (top.removeFromRight (120).reduced (2));
-    top.removeFromRight (10);
-    audioButton.setBounds (top.removeFromRight (210).reduced (2));
+    panicButton.setBounds (top.removeFromRight (130).reduced (2));
+    top.removeFromRight (8);
+    scanButton.setBounds (top.removeFromRight (170).reduced (2));
+    top.removeFromRight (8);
+    audioButton.setBounds (top.removeFromRight (190).reduced (2));
+    top.removeFromRight (20);
+    clockLost.setBounds (top.removeFromRight (120));
+    clockMenu.setBounds (top.removeFromRight (180).reduced (2, 9));
+    clockLabel.setBounds (top.removeFromRight (70));
+    top.removeFromRight (8);
+    tapButton.setBounds (top.removeFromRight (70).reduced (2));
+    bpm.setBounds (top.removeFromRight (160).reduced (2, 8));
+    tempoSourceButton.setBounds (top.removeFromRight (60).reduced (2));
     title.setBounds (top);
 
     statusLabel.setBounds (r.removeFromBottom (28));
     r.removeFromTop (12);
     r.removeFromBottom (8);
+
+    patchPanel->setBounds (r.removeFromRight (380));
+    r.removeFromRight (10);
 
     const int gap = 10;
     const int w = (r.getWidth() - gap * (StageEngine::numStations - 1)) / StageEngine::numStations;
@@ -102,32 +142,23 @@ void MainComponent::showAudioSettings()
     audioSettingsWindow = o.launchAsync();
 }
 
-void MainComponent::startScan (std::function<void()> afterwards)
+// Il tasto apre un menu: la scansione vera e la lista delle cartelle in piu'.
+void MainComponent::showScanMenu()
 {
-    if (catalog.isScanning())
-        return;
-
-    const auto folders = catalog.foldersToScan();
-    statusMessage = "Scansione in corso su " + juce::String (folders.size()) + " cartelle...";
-    scanButton.setEnabled (false);
-
-    catalog.scanAsync ([safe = juce::Component::SafePointer<MainComponent> (this), afterwards]
-                       (int found, juce::StringArray failed)
+    juce::PopupMenu m;
+    m.addItem (1, "Scansiona adesso", ! catalog.isScanning());
+    m.addItem (2, "Cartelle in piu'...");
+    m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (scanButton),
+                     [safe = juce::Component::SafePointer<MainComponent> (this)] (int choice)
     {
         if (auto* self = safe.getComponent())
         {
-            self->scanButton.setEnabled (true);
-            self->statusMessage = "Scansione finita: " + juce::String (found) + " plugin nuovi"
-                                + (failed.isEmpty() ? juce::String() : ", " + juce::String (failed.size()) + " scartati");
-            for (auto& p : self->panels)
-                p->refreshPluginMenus();
-            if (afterwards)
-                afterwards();
+            if (choice == 1) self->startScan();
+            if (choice == 2) self->showScanFolders();
         }
     });
 }
 
-//==============================================================================
 void MainComponent::loadScanFolders()
 {
     juce::StringArray folders;
@@ -152,28 +183,28 @@ void MainComponent::showScanFolders()
     }
 
     auto* panel = new juce::Component();
-    panel->setSize (560, 320);
+    panel->setSize (560, 300);
 
-    auto* info = new juce::Label ({}, "Cartelle in piu' da battere, una per riga. Quelle standard del sistema "
-                                      "sono gia' comprese.");
-    info->setFont (StageLookAndFeel::titleFont (16.0f));
+    auto* info = new juce::Label ({}, "Cartelle in piu' da battere nella scansione, una per riga. "
+                                      "Quelle standard del sistema sono gia' comprese.");
     info->setJustificationType (juce::Justification::topLeft);
-    info->setBounds (12, 8, 536, 40);
+    info->setBounds (12, 8, 536, 44);
     panel->addAndMakeVisible (info);
 
     auto* text = new juce::TextEditor();
     text->setMultiLine (true, false);
     text->setReturnKeyStartsNewLine (true);
     text->setText (catalog.getExtraFolders().joinIntoString ("\n"));
-    text->setBounds (12, 52, 536, 190);
+    text->setBounds (12, 56, 536, 170);
     panel->addAndMakeVisible (text);
 
     auto* add = new juce::TextButton ("AGGIUNGI CARTELLA...");
-    add->setBounds (12, 254, 220, 30);
+    add->setBounds (12, 238, 220, 30);
     add->onClick = [this, text]
     {
         chooser = std::make_unique<juce::FileChooser> ("Scegli una cartella di plugin");
-        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+        chooser->launchAsync (juce::FileBrowserComponent::openMode
+                            | juce::FileBrowserComponent::canSelectDirectories,
                               [text] (const juce::FileChooser& fc)
         {
             const auto dir = fc.getResult();
@@ -184,7 +215,7 @@ void MainComponent::showScanFolders()
     panel->addAndMakeVisible (add);
 
     auto* ok = new juce::TextButton ("SALVA");
-    ok->setBounds (438, 254, 110, 30);
+    ok->setBounds (438, 238, 110, 30);
     ok->onClick = [this, text]
     {
         juce::StringArray folders;
@@ -193,7 +224,7 @@ void MainComponent::showScanFolders()
         folders.removeEmptyStrings();
         saveScanFolders (folders);
         statusMessage = "Cartelle salvate: " + juce::String (folders.size())
-                      + " in piu'. Premi SCANSIONA PLUGIN per rileggerle.";
+                      + " in piu'. Rifai la scansione per rileggerle.";
         if (auto* w = foldersWindow.getComponent())
             w->exitModalState (0);
     };
@@ -208,85 +239,25 @@ void MainComponent::showScanFolders()
     foldersWindow = o.launchAsync();
 }
 
-//==============================================================================
-void MainComponent::restoreSavedPlugins()
+void MainComponent::startScan()
 {
-    const auto& saved = engine.savedStationStates();
-
-    juce::StringArray missing;
-    int wanted = 0;
-    for (const auto& st : saved)
-        for (const auto& id : st.allPluginIds())
-        {
-            ++wanted;
-            if (! catalog.findByPortableId (id))
-                missing.add (id);
-        }
-
-    if (wanted == 0)
+    if (catalog.isScanning())
         return;
 
-    // Un plugin che non risulta nell'elenco puo' essere appena stato compilato:
-    // vale la pena rifare la scansione una volta sola, poi si riprova.
-    if (! missing.isEmpty() && ! scannedForMissingPlugins && ! catalog.isScanning())
-    {
-        scannedForMissingPlugins = true;
-        statusMessage = juce::String (missing.size()) + " plugin delle postazioni non sono nell'elenco: riscansiono";
-        startScan ([safe = juce::Component::SafePointer<MainComponent> (this)]
-                   { if (auto* self = safe.getComponent()) self->restoreSavedPlugins(); });
-        return;
-    }
+    statusMessage = "Scansione in corso su " + juce::String (catalog.foldersToScan().size()) + " cartelle...";
+    scanButton.setEnabled (false);
 
-    pluginsToRestore = wanted;
-    pluginsRestored = 0;
-    statusMessage = "Carico i plugin delle postazioni...";
-
-    for (int i = 0; i < StageEngine::numStations; ++i)
+    catalog.scanAsync ([safe = juce::Component::SafePointer<MainComponent> (this)] (int found, juce::StringArray failed)
     {
-        const auto& st = saved[(size_t) i];
-        for (int slot = 0; slot <= Station::maxEffects; ++slot)
+        if (auto* self = safe.getComponent())
         {
-            const auto id = slot == 0 ? st.instrumentId : st.effectIds[(size_t) (slot - 1)];
-            if (id.isEmpty())
-                continue;
-
-            const auto desc = catalog.findByPortableId (id);
-            if (! desc.has_value())
-            {
-                ++pluginsRestored;
-                engine.station (i).setLoadError ("non trovato: " + id);
-                continue;
-            }
-
-            catalog.createInstanceAsync (*desc, engine.getSampleRate(), engine.getBlockSize(),
-                [safe = juce::Component::SafePointer<MainComponent> (this), i, slot]
-                (std::unique_ptr<juce::AudioPluginInstance> inst, juce::String error)
-                {
-                    auto* self = safe.getComponent();
-                    if (self == nullptr)
-                        return;
-
-                    auto& station = self->engine.station (i);
-                    if (inst == nullptr)
-                    {
-                        station.setLoadError (error);
-                    }
-                    else
-                    {
-                        if (slot == 0) station.setInstrument (std::move (inst));
-                        else           station.setEffect (slot - 1, std::move (inst));
-                        station.setLoadError ({});
-                    }
-
-                    ++self->pluginsRestored;
-                    self->panels[(size_t) i]->refreshPluginMenus();
-
-                    if (self->pluginsRestored >= self->pluginsToRestore)
-                        self->statusMessage = "Postazioni pronte: " + juce::String (self->pluginsToRestore)
-                                            + " plugin caricati";
-                });
+            self->scanButton.setEnabled (true);
+            self->statusMessage = "Scansione finita: " + juce::String (found) + " plugin nuovi"
+                                + (failed.isEmpty() ? juce::String() : ", " + juce::String (failed.size()) + " scartati");
+            for (auto& p : self->panels)
+                p->refreshPluginMenus();
         }
-    }
+    });
 }
 
 void MainComponent::startInitialScanIfNeeded (bool listFileExisted)
@@ -294,14 +265,48 @@ void MainComponent::startInitialScanIfNeeded (bool listFileExisted)
     loadScanFolders();
 
     if (! listFileExisted)
-        startScan ([safe = juce::Component::SafePointer<MainComponent> (this)]
-                   { if (auto* self = safe.getComponent()) self->restoreSavedPlugins(); });
-    else
-        restoreSavedPlugins();
+        startScan();
+}
+
+void MainComponent::refreshClockMenu()
+{
+    clockIds.clear();
+    clockMenu.clear (juce::dontSendNotification);
+    clockMenu.addItem ("- NESSUNO -", 1);
+    clockIds.add ({});
+    for (const auto& d : juce::MidiInput::getAvailableDevices())
+    {
+        if (StageEngine::isReservedControlDevice (d.name))
+            continue;
+        clockIds.add (d.identifier);
+        clockMenu.addItem (d.name, clockIds.size());
+    }
+    const int idx = clockIds.indexOf (engine.getClockSourceDevice());
+    clockMenu.setSelectedId (idx >= 0 ? idx + 1 : 1, juce::dontSendNotification);
+}
+
+void MainComponent::tempoControlsChanged()
+{
+    const bool ext = tempoSourceButton.getToggleState();
+    engine.tempo().setSource (ext ? TempoTracker::Source::external : TempoTracker::Source::internal);
+    const int sel = clockMenu.getSelectedId() - 1;
+    engine.setClockSourceDevice (juce::isPositiveAndBelow (sel, clockIds.size()) ? clockIds[sel] : juce::String());
+    engine.saveKeyboardSettings();
 }
 
 void MainComponent::timerCallback()
 {
+    // Tempo
+    auto& tempo = engine.tempo();
+    const bool ext = tempo.getSource() == TempoTracker::Source::external;
+    tempoSourceButton.setButtonText (ext ? "EXT" : "INT");
+    bpm.setEnabled (! ext);
+    tapButton.setEnabled (! ext);
+    if (! bpm.isMouseButtonDown())
+        bpm.setValue (tempo.getBpm(), juce::dontSendNotification);
+    clockLost.setText (ext && tempo.isClockLost (juce::Time::getMillisecondCounterHiRes() * 0.001) ? "CLOCK ASSENTE" : "",
+                       juce::dontSendNotification);
+
     juce::String text;
     if (statusMessage.isNotEmpty())
         text << statusMessage << "    ";

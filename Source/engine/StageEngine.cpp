@@ -1,5 +1,4 @@
 #include "StageEngine.h"
-#include "../plugins/PluginCatalog.h"
 #include "settings/AppPaths.h"
 
 namespace
@@ -17,6 +16,9 @@ StageEngine::StageEngine()
         b.ensureSize (2048);
     for (auto& c : collectors)
         c.reset (currentSampleRate.load());
+
+    for (auto& st : stations)
+        st.setPlayHead (&playHead);   // tempo e posizione ai plugin
 
     // La Keystation (postazione 1) usa il suo fader come volume (spec 5.3).
     KeyZone first;
@@ -151,6 +153,9 @@ void StageEngine::prepare (double sampleRate, int blockSize)
 
     for (auto& c : collectors)
         c.reset (sampleRate);
+
+    limiterRelease = (float) std::exp (-1.0 / (0.1 * sampleRate));   // costante di 100 ms
+    limiterEnvelope = 0.0f;
 }
 
 void StageEngine::injectMidiForTest (int station0to3, const juce::MidiBuffer& midi)
@@ -195,6 +200,8 @@ void StageEngine::renderBlock (juce::AudioBuffer<float>& out)
         stations[i].renderAdd (out, stationMidi[i]);
     }
 
+    tempoTracker.advance (numSamples, currentSampleRate.load());
+
     masterGain.setTargetValue (masterTarget.load());
     if (masterGain.isSmoothing())
     {
@@ -208,6 +215,24 @@ void StageEngine::renderBlock (juce::AudioBuffer<float>& out)
     else
     {
         out.applyGain (masterGain.getTargetValue());
+    }
+
+    // Limitatore di sicurezza dopo il volume master, collegato su tutti i canali.
+    if (limiterRelease <= 0.0f)
+        limiterRelease = (float) std::exp (-1.0 / (0.1 * currentSampleRate.load()));
+    const int channels = out.getNumChannels();
+    for (int i = 0; i < numSamples; ++i)
+    {
+        float peak = 0.0f;
+        for (int ch = 0; ch < channels; ++ch)
+            peak = juce::jmax (peak, std::abs (out.getSample (ch, i)));
+        limiterEnvelope = juce::jmax (peak, limiterEnvelope * limiterRelease);
+        if (limiterEnvelope > limiterThreshold)
+        {
+            const float g = limiterThreshold / limiterEnvelope;
+            for (int ch = 0; ch < channels; ++ch)
+                out.setSample (ch, i, out.getSample (ch, i) * g);
+        }
     }
 }
 
@@ -234,6 +259,14 @@ void StageEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
 
 void StageEngine::routeIncoming (const juce::String& deviceId, const juce::String& deviceName, const juce::MidiMessage& m)
 {
+    // Messaggi di sincronia: solo dall'ingresso scelto come clock, mai alle postazioni.
+    if (m.isMidiClock() || m.isMidiStart() || m.isMidiStop() || m.isMidiContinue() || m.isSongPositionPointer())
+    {
+        if (deviceId == getClockSourceDevice())
+            tempoTracker.handleClockMessage (m, m.getTimeStamp());
+        return;
+    }
+
     // Prima di un'eventuale riassegnazione: dove suonava questa tastiera e chi aveva la postazione.
     const int previousStation = router.stationFor (deviceId);
     const int learningStation = router.learningStation();
@@ -309,37 +342,15 @@ void StageEngine::loadKeyboardSettings()
     }
 
     if (auto xml = juce::parseXML (AppPaths::stationsFile()))
-        savedStations = stationsFromValueTree (juce::ValueTree::fromXml (*xml));
-
-    // Zona, volume e mute si ripristinano subito; i plugin li carica la finestra,
-    // perche' serve il catalogo e l'operazione e' lenta.
-    for (int i = 0; i < numStations; ++i)
     {
-        const auto& s = savedStations[(size_t) i];
-        processors[(size_t) i].setZone (s.zone);
-        stations[(size_t) i].setGainDb (s.gainDb);
-        stations[(size_t) i].setMuted (s.muted);
+        const auto tree = juce::ValueTree::fromXml (*xml);
+        for (int i = 0; i < numStations && i < tree.getNumChildren(); ++i)
+            processors[(size_t) i].setZone (KeyZone::fromValueTree (tree.getChild (i)));
+        tempoTracker.setBpm ((double) tree.getProperty ("bpm", 120.0));
+        tempoTracker.setSource ((int) tree.getProperty ("tempoEsterno", 0) != 0 ? TempoTracker::Source::external
+                                                                               : TempoTracker::Source::internal);
+        setClockSourceDevice (tree.getProperty ("clockDa").toString());
     }
-}
-
-StationStates StageEngine::captureStationStates() const
-{
-    StationStates out;
-    for (int i = 0; i < numStations; ++i)
-    {
-        auto& s = out[(size_t) i];
-        const auto& station = stations[(size_t) i];
-        s.zone = processors[(size_t) i].getZone();
-        s.gainDb = station.getGainDb();
-        s.muted = station.isMuted();
-
-        if (auto* inst = station.getInstrument())
-            s.instrumentId = makePortableId (inst->getPluginDescription());
-        for (int e = 0; e < Station::maxEffects && e < StationState::maxEffects; ++e)
-            if (auto* fx = station.getEffect (e))
-                s.effectIds[(size_t) e] = makePortableId (fx->getPluginDescription());
-    }
-    return out;
 }
 
 void StageEngine::saveKeyboardSettings() const
@@ -347,7 +358,13 @@ void StageEngine::saveKeyboardSettings() const
     if (auto xml = router.toXml())
         xml->writeTo (AppPaths::keyboardsFile());
 
-    if (auto xml = stationsToValueTree (captureStationStates()).createXml())
+    juce::ValueTree tree ("POSTAZIONI");
+    tree.setProperty ("bpm", tempoTracker.getSource() == TempoTracker::Source::internal ? tempoTracker.getBpm() : 120.0, nullptr);
+    tree.setProperty ("tempoEsterno", tempoTracker.getSource() == TempoTracker::Source::external ? 1 : 0, nullptr);
+    tree.setProperty ("clockDa", getClockSourceDevice(), nullptr);
+    for (const auto& p : processors)
+        tree.appendChild (p.getZone().toValueTree(), nullptr);
+    if (auto xml = tree.createXml())
         xml->writeTo (AppPaths::stationsFile());
 }
 
@@ -362,4 +379,18 @@ void StageEngine::releaseStation (int station)
 void StageEngine::deviceDisconnected (const juce::String& deviceId)
 {
     releaseStation (router.stationFor (deviceId));
+}
+
+TempoTracker& StageEngine::tempo() { return tempoTracker; }
+
+void StageEngine::setClockSourceDevice (const juce::String& id)
+{
+    const juce::ScopedLock sl (clockSourceLock);
+    clockSource = id;
+}
+
+juce::String StageEngine::getClockSourceDevice() const
+{
+    const juce::ScopedLock sl (clockSourceLock);
+    return clockSource;
 }
