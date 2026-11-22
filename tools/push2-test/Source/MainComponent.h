@@ -27,6 +27,7 @@ private:
         juce::String name;   // nome del plugin
         juce::Colour colour;
         int device;          // indice in deviceNames
+        TextPart::Face nameFace = TextPart::Face::logoBold;
     };
 
     // MIDI

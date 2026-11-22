@@ -55,6 +55,8 @@ juce_add_binary_data(Push2TestAssets SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Assets/Fonts/BebasNeue-Regular.ttf
     Assets/Fonts/Comfortaa-Light.ttf
     Assets/Fonts/Comfortaa-Bold.ttf
+    Assets/Fonts/Quantico-Regular.ttf
+    Assets/Fonts/Yellowtail-Regular.ttf
     Assets/brand/mbstudio91-wordmark.png)
 
 target_sources(MBStudio91Push2Test PRIVATE

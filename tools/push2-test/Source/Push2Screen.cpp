@@ -7,10 +7,6 @@ namespace
 {
 const juce::Colour white = juce::Colours::white;
 
-// Fonte: segnalazione di un utente su Gearspace, sulla Mini MK1 "LAUNCH" e' arancione
-// (sulla MK2 bianco). Da verificare sul pannello.
-const juce::Colour launchOrange { 0xffff8a00 };
-
 TextPart part (const juce::String& t, Style s, float gap = 0.0f, juce::Colour c = white, float scale = 1.0f)
 {
     TextPart p;
@@ -59,7 +55,9 @@ juce::Image shrinkMask (const juce::Image& src, int w, int h)
 
 namespace devices
 {
-// LAUNCH grassetto, KEY normale, MINI in negativo: come indicato da Mirco
+// Dalle foto del pannello mandate da Mirco: LAUNCH grassetto, KEY sottile,
+// il modello in un riquadro bianco con la scritta nera. Il MK non e' stampato
+// sul pannello, lo aggiungo piccolo per distinguere le sue tre tastiere.
 StyledText launchkeyMiniMk1()
 {
     return { part ("LAUNCH", Style::bold), part ("KEY", Style::regular),
@@ -72,23 +70,24 @@ StyledText launchkeyMiniMk2()
              part ("MINI", Style::inverted, 0.16f), mk ("MK2") };
 }
 
-// Stesso schema della famiglia Launch; il trattamento del "61" e' da verificare
 StyledText launchkey61Mk2()
 {
     return { part ("LAUNCH", Style::bold), part ("KEY", Style::regular),
-             part ("61", Style::regular, 0.16f), mk ("MK2") };
+             part ("61", Style::inverted, 0.16f), mk ("MK2") };
 }
 
-// KEYSTATION grassetto, 88 normale, MK3 in negativo: come indicato da Mirco
+// Dalla foto del pannello: KEYSTATION grassetto attaccato a 88 sottile,
+// poi MK3 nel riquadro chiaro con la scritta scura
 StyledText keystation88Mk3()
 {
-    return { part ("KEYSTATION", Style::bold), part ("88", Style::regular, 0.16f),
-             part ("MK3", Style::inverted, 0.16f, white, 0.5f) };
+    return { part ("KEYSTATION", Style::bold), part ("88", Style::regular),
+             part ("MK3", Style::inverted, 0.16f, white, 0.62f) };
 }
 
+// Da verificare su una foto del pannello: per ora segue lo schema delle Launchkey
 StyledText launchpadMiniMk1()
 {
-    return { part ("LAUNCH", Style::bold, 0.0f, launchOrange), part ("PAD", Style::regular),
+    return { part ("LAUNCH", Style::bold), part ("PAD", Style::regular),
              part ("MINI", Style::inverted, 0.16f) };
 }
 } // namespace devices
@@ -117,6 +116,18 @@ StyledText logoStyleName (const juce::String& name, juce::Colour colour)
     return t;
 }
 
+StyledText brandName (const juce::String& name, juce::Colour colour, TextPart::Face face)
+{
+    // Lo script va lasciato com'e' scritto: tutto maiuscolo sarebbe illeggibile
+    auto p = part (face == TextPart::Face::script ? name : name.toUpperCase(),
+                   Style::regular, 0.0f, colour);
+    p.face = face;
+    // lo script ha maiuscole piu' piccole a parita' di corpo: lo ingrandisco
+    if (face == TextPart::Face::script)
+        p.scale = 1.18f;
+    return { p };
+}
+
 float drawStyledText (juce::Graphics& g, const StyledText& parts, float x, float baseline,
                       float height, const Faces& faces, bool draw)
 {
@@ -129,6 +140,8 @@ float drawStyledText (juce::Graphics& g, const StyledText& parts, float x, float
 
         const auto& face = p.face == TextPart::Face::logoLight ? faces.logoLight
                          : p.face == TextPart::Face::logoBold  ? faces.logoBold
+                         : p.face == TextPart::Face::script    ? faces.script
+                         : p.face == TextPart::Face::square    ? faces.square
                                                                : faces.bebas;
         juce::Font font (juce::FontOptions().withTypeface (face).withHeight (h));
         juce::GlyphArrangement ga;
@@ -159,8 +172,9 @@ float drawStyledText (juce::Graphics& g, const StyledText& parts, float x, float
             if (p.style == Style::inverted)
             {
                 g.setColour (p.colour);
-                g.fillRect (juce::Rectangle<float> (x, baseline + ink.getY() - padY,
-                                                    width, ink.getHeight() + 2.0f * padY));
+                const juce::Rectangle<float> box (x, baseline + ink.getY() - padY,
+                                                  width, ink.getHeight() + 2.0f * padY);
+                g.fillRoundedRectangle (box, h * 0.16f);
                 g.setColour (juce::Colours::black);
                 g.fillPath (path, placed);
             }
@@ -219,8 +233,12 @@ juce::Image renderScreen (const std::vector<ScreenSetup>& setups, int active,
     if (active >= 0 && active < (int) setups.size())
     {
         const auto& s = setups[(size_t) active];
-        const auto name = logoStyleName (s.plugin, s.colour);
-        const float deviceH = 34.0f, gap = 30.0f, baseline = 104.0f;
+        const auto name = s.nameFace == TextPart::Face::logoBold
+                            ? logoStyleName (s.plugin, s.colour)
+                            : brandName (s.plugin, s.colour, s.nameFace);
+        const float deviceH = 34.0f, baseline = 104.0f;
+        // lo script sporge a destra per via dell'inclinazione: gli lascio piu' spazio
+        const float gap = s.nameFace == TextPart::Face::script ? 46.0f : 30.0f;
         float nameH = 66.0f;
 
         const float devW = s.device.empty() ? 0.0f : drawStyledText (g, s.device, 0, 0, deviceH, faces, false);

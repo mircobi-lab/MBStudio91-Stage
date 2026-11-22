@@ -8,7 +8,7 @@
 struct TextPart
 {
     enum class Style { regular, bold, inverted };
-    enum class Face { bebas, logoLight, logoBold };
+    enum class Face { bebas, logoLight, logoBold, script, square };
 
     juce::String text;
     Style style = Style::regular;
@@ -21,6 +21,7 @@ struct TextPart
 struct Faces
 {
     juce::Typeface::Ptr bebas, logoLight, logoBold;
+    juce::Typeface::Ptr script, square; // somiglianti ai marchi Sylenth1 e DUNE
     juce::Image logo; // maschera bianca del marchio MBSTUDIO91
 };
 
@@ -42,11 +43,17 @@ StyledText cellName (const juce::String& name, juce::Colour colour);
 // Nome al centro, stile logo MBSTUDIO91: solo l'iniziale spessa, il resto sottile
 StyledText logoStyleName (const juce::String& name, juce::Colour colour);
 
+// Nome al centro in un carattere somigliante al marchio del plugin
+StyledText brandName (const juce::String& name, juce::Colour colour, TextPart::Face face);
+
 struct ScreenSetup
 {
     juce::String plugin;
     StyledText device;
     juce::Colour colour;
+    // Come scrivere il nome al centro: logoBold = stile MBSTUDIO91,
+    // script o square = carattere somigliante al marchio del plugin
+    TextPart::Face nameFace = TextPart::Face::logoBold;
 };
 
 // Disegna la schermata 960x160 del Push 2

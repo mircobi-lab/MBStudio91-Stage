@@ -9,7 +9,10 @@ Cosa fa:
 - gli 8 tasti sopra il display e i pad in basso cambiano setup;
 - un pad premuto diventa bianco finché lo tieni giù; in finestra compaiono nota e velocity;
 - encoder e altri tasti compaiono in finestra come numero di CC;
-- il display mostra le 8 caselle allineate ai tasti, il nome del setup attivo e il firmware.
+- il display mostra le 8 caselle allineate ai tasti, il nome del setup attivo e il firmware;
+- il nome al centro segue lo stile del logo MBSTUDIO91 (solo l'iniziale spessa); Sylenth1 e
+  DUNE usano un carattere somigliante al loro marchio;
+- accanto al nome compare la tastiera abbinata, scritta come sul pannello.
 
 Usa solo comandi documentati da Ableton in
 [push-interface](https://github.com/Ableton/push-interface). Prima di cambiare le voci 1-16
@@ -40,5 +43,12 @@ cmake -S . -B build -DPUSH2_ONLY_TESTS=ON && cmake --build build && ctest --test
 
 ## Licenze
 
-Bebas Neue: lo stesso file di MBStudio91 Stage, SIL Open Font License (`Assets/Fonts/OFL.txt` nella radice).
-libusb: LGPL 2.1.
+- Bebas Neue: lo stesso file di MBStudio91 Stage, SIL Open Font License (`Assets/Fonts/OFL.txt` nella radice).
+- Comfortaa Light e Bold, per il nome in stile logo MBSTUDIO91: SIL Open Font License.
+- Quantico Regular, per il nome di DUNE: SIL Open Font License.
+- Yellowtail Regular, per il nome di Sylenth1: Apache License 2.0.
+- libusb: LGPL 2.1.
+
+Quantico e Yellowtail somigliano ai marchi di DUNE e Sylenth1, non sono i caratteri
+originali, che non sono liberi. Il marchio MBSTUDIO91 e i nomi delle periferiche sono
+disegnati con questi font, nessun file di terzi e' incluso.

@@ -15,8 +15,8 @@ MainComponent::MainComponent()
     enum { lkMini1, lkMini2, lk61, ks88 };
     setups = { { { "Piano",    juce::Colour (0xfff2e6cc), ks88 },
                  { "Rhodes",   juce::Colour (0xffff8c1a), lk61 },
-                 { "Sylenth1", juce::Colour (0xff1ad1ff), lk61 },
-                 { "DUNE 2",   juce::Colour (0xff9b4dff), lkMini2 },
+                 { "Sylenth1", juce::Colour (0xff1ad1ff), lk61,    TextPart::Face::script },
+                 { "DUNE 2",   juce::Colour (0xff9b4dff), lkMini2, TextPart::Face::square },
                  { "Acido",    juce::Colour (0xffb8ff1a), lkMini1 },
                  { "ICX7",     juce::Colour (0xff1a5cff), lk61 },
                  { "MuMU",     juce::Colour (0xffff2a1a), lkMini2 },
@@ -27,6 +27,8 @@ MainComponent::MainComponent()
     faces.bebas = bebas;
     faces.logoLight = juce::Typeface::createSystemTypefaceFor (BinaryData::ComfortaaLight_ttf, BinaryData::ComfortaaLight_ttfSize);
     faces.logoBold  = juce::Typeface::createSystemTypefaceFor (BinaryData::ComfortaaBold_ttf, BinaryData::ComfortaaBold_ttfSize);
+    faces.script = juce::Typeface::createSystemTypefaceFor (BinaryData::YellowtailRegular_ttf, BinaryData::YellowtailRegular_ttfSize);
+    faces.square = juce::Typeface::createSystemTypefaceFor (BinaryData::QuanticoRegular_ttf, BinaryData::QuanticoRegular_ttfSize);
     faces.logo = juce::ImageCache::getFromMemory (BinaryData::mbstudio91wordmark_png, BinaryData::mbstudio91wordmark_pngSize);
     auto font = [this] (float h) { return juce::Font (juce::FontOptions().withTypeface (bebas).withHeight (h)); };
 
@@ -348,7 +350,7 @@ void MainComponent::renderDisplay()
                                                          devices::launchkey61Mk2(), devices::keystation88Mk3() };
     std::vector<ScreenSetup> list;
     for (const auto& s : setups)
-        list.push_back ({ s.name, deviceNames[(size_t) s.device], s.colour });
+        list.push_back ({ s.name, deviceNames[(size_t) s.device], s.colour, s.nameFace });
     display.setImage (renderScreen (list, activeSetup, devices::launchpadMiniMk1(),
                                     firmware ? firmware->upToFirstOccurrenceOf (" ", false, false) : juce::String(), faces));
     repaint();
