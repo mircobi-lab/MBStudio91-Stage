@@ -55,10 +55,12 @@ jobs:
           test "$ARCHS" = "x86_64"
           # libusb e' compilata dentro l'app: non deve comparire tra le librerie esterne
           if otool -L "$BIN" | grep -i libusb; then exit 1; fi
-          # l'icona deve essere finita nel bundle
-          ICNS="build/MBStudio91Push2Test_artefacts/Release/MBStudio91 Push2 Test.app/Contents/Resources/Icon.icns"
+          # l'icona deve essere finita nel bundle (JUCE la chiama AppIcon.icns)
+          APP="build/MBStudio91Push2Test_artefacts/Release/MBStudio91 Push2 Test.app"
+          ICNS=$(ls "$APP/Contents/Resources/"*.icns | head -1)
+          test -n "$ICNS"
           ls -la "$ICNS"
-          sips -g pixelWidth -g pixelHeight "$ICNS" | tail -2
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIconFile" "$APP/Contents/Info.plist"
 
       - name: Crea lo zip
         run: |
