@@ -72,6 +72,11 @@ std::optional<std::pair<int, int>> padPosition (int note)
     return std::make_pair (7 - fromBottom, (note - 36) % 8);
 }
 
+int encoderDelta (int ccValue)
+{
+    return ccValue < 64 ? ccValue : ccValue - 128;
+}
+
 Bytes identityRequest()
 {
     return { 0xF0, 0x7E, 0x01, 0x06, 0x01, 0xF7 };

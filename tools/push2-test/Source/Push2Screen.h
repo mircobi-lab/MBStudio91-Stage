@@ -54,10 +54,13 @@ struct ScreenSetup
     // Come scrivere il nome al centro: logoBold = stile MBSTUDIO91,
     // script o square = carattere somigliante al marchio del plugin
     TextPart::Face nameFace = TextPart::Face::logoBold;
+    float volume = 0.75f; // 0..1, dal rotativo sopra la casella
+    bool locked = false;  // volume bloccato: il rotativo non lo muove piu'
 };
 
 // Disegna la schermata 960x160 del Push 2
-juce::Image renderScreen (const std::vector<ScreenSetup>& setups, int active,
+// touched: indice del rotativo che si sta toccando, -1 se nessuno
+juce::Image renderScreen (const std::vector<ScreenSetup>& setups, int active, int touched,
                           const StyledText& setupChanger,
                           const juce::String& firmware, const Faces& faces);
 

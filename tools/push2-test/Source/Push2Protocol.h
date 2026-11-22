@@ -41,6 +41,15 @@ std::optional<std::pair<int, int>> padPosition (int note); // {riga, colonna}
 constexpr int upperDisplayButtonCC = 102; // 102..109 sopra il display
 constexpr int lowerDisplayButtonCC = 20;  // 20..27 sotto il display
 
+// Gli 8 rotativi in alto (Push2-map.json): girandoli mandano CC 71..78,
+// toccandoli mandano le note 0..7 con velocity 127, lasciandoli velocity 0
+constexpr int trackEncoderCC = 71;
+constexpr int trackEncoderTouchNote = 0;
+constexpr int numTrackEncoders = 8;
+
+// Quanti scatti e in che verso: il valore e' relativo, in complemento a due
+int encoderDelta (int ccValue);
+
 // Indici della palette di fabbrica garantiti dal manuale
 constexpr int colourBlack = 0;
 constexpr int colourWhite = 122;

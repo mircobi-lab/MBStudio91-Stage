@@ -6,16 +6,24 @@ Cosa fa:
 
 - legge firmware, numero di serie e revisione della scheda (Identity Request);
 - colora i 64 pad: la fila in basso ha un pad per ciascuno degli 8 setup, le altre righe prendono il colore del setup attivo;
-- gli 8 tasti sopra il display e i pad in basso cambiano setup;
+- gli 8 rotativi in alto regolano il volume del setup che hanno sotto, uno scatto = 1%;
+- toccando un rotativo senza girarlo il volume si blocca, toccandolo di nuovo si sblocca;
+  finche' e' bloccato il rotativo non lo muove e nella casella compare un lucchetto;
+- mentre si tiene un rotativo il centro del display mostra quel volume in percentuale;
+- la selezione del setup passa solo dal tasto con il LED sotto il rotativo
+  (i pad della fila in basso restano attivi per la prova);
 - un pad premuto diventa bianco finché lo tieni giù; in finestra compaiono nota e velocity;
 - encoder e altri tasti compaiono in finestra come numero di CC;
-- il display mostra le 8 caselle allineate ai tasti, il nome del setup attivo e il firmware;
+- il display mostra le 8 caselle allineate ai rotativi, con nome e barra del volume,
+  il nome del setup attivo e il firmware;
 - il nome al centro segue lo stile del logo MBSTUDIO91 (solo l'iniziale spessa); Sylenth1 e
   DUNE usano un carattere somigliante al loro marchio;
 - accanto al nome compare la tastiera abbinata, scritta come sul pannello.
 
 Usa solo comandi documentati da Ableton in
-[push-interface](https://github.com/Ableton/push-interface). Prima di cambiare le voci 1-16
+[push-interface](https://github.com/Ableton/push-interface): numeri di pad, tasti e
+rotativi da `doc/Push2-map.json` (rotativi CC 71-78, tocco note 0-7, tasti sopra il
+display CC 102-109), valore relativo dei rotativi in complemento a due. Prima di cambiare le voci 1-16
 della palette colori le legge dal Push e le rimette a posto quando chiudi l'app.
 
 ## Come usarla

@@ -64,6 +64,10 @@ private:
     int paletteWaitTicks = 0;
 
     std::array<bool, 128> padDown {};
+    std::array<float, numSetups> volume {};
+    std::array<bool, numSetups> volumeLocked {};
+    std::array<bool, numSetups> encoderMoved {}; // girato mentre lo si teneva
+    int touchedEncoder = -1;
     juce::String lastEvent { "Premi un pad o un tasto sopra il display" };
 
     Push2Display display;

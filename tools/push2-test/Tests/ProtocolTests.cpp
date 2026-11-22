@@ -29,6 +29,17 @@ int main()
     CHECK (! padPosition (35));
     CHECK (! padPosition (100));
 
+    // Rotativi: valore relativo in complemento a due, 1..63 a destra, 127..64 a sinistra
+    CHECK (encoderDelta (1) == 1);
+    CHECK (encoderDelta (63) == 63);
+    CHECK (encoderDelta (127) == -1);
+    CHECK (encoderDelta (64) == -64);
+    CHECK (encoderDelta (0) == 0);
+    CHECK (trackEncoderCC == 71 && trackEncoderTouchNote == 0);
+    // le note del tocco stanno fuori dall'intervallo dei pad, non si confondono
+    for (int n = trackEncoderTouchNote; n < trackEncoderTouchNote + numTrackEncoders; ++n)
+        CHECK (! padPosition (n));
+
     // Identity Reply letta dal Push 2 di Mirco (Mac mini, 21/11/2026)
     const std::uint8_t reply[] { 0xF0, 0x7E, 0x01, 0x06, 0x02, 0x00, 0x21, 0x1D, 0x67, 0x32, 0x02, 0x00,
                                  0x01, 0x00, 0x47, 0x00, 0x50, 0x4D, 0x5C, 0x08, 0x00, 0x01, 0xF7 };

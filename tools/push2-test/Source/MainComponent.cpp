@@ -57,7 +57,9 @@ MainComponent::MainComponent()
         addAndMakeVisible (b);
     }
 
-    setSize (760, 360);
+    volume.fill (0.75f);
+
+    setSize (760, 380);
     selectSetup (0);
     updateStatus();
     startTimer (100);
@@ -184,6 +186,32 @@ void MainComponent::handleMessage (const juce::MidiMessage& m)
         return;
     }
 
+    // Tocco sui rotativi: note 0..7. Un tocco senza giro blocca o sblocca il volume.
+    const int note0 = m.getNoteNumber() - push2::trackEncoderTouchNote;
+    if ((m.isNoteOn() || m.isNoteOff()) && note0 >= 0 && note0 < push2::numTrackEncoders
+        && note0 < numSetups)
+    {
+        if (m.isNoteOn() && m.getVelocity() > 0)
+        {
+            touchedEncoder = note0;
+            encoderMoved[(size_t) note0] = false;
+            lastEvent = "Rotativo " + juce::String (note0 + 1) + " toccato";
+        }
+        else
+        {
+            if (! encoderMoved[(size_t) note0])
+            {
+                volumeLocked[(size_t) note0] = ! volumeLocked[(size_t) note0];
+                lastEvent = "Volume " + setups[(size_t) note0].name + " "
+                          + (volumeLocked[(size_t) note0] ? "bloccato" : "sbloccato");
+            }
+            touchedEncoder = -1;
+        }
+        renderDisplay();
+        updateStatus();
+        return;
+    }
+
     if (m.isNoteOn())
     {
         const int note = m.getNoteNumber();
@@ -217,6 +245,28 @@ void MainComponent::handleMessage (const juce::MidiMessage& m)
     {
         const int cc = m.getControllerNumber();
         const int v = m.getControllerValue();
+
+        // Rotativi: volume del setup che hanno sopra, uno scatto = 1%
+        const int enc = cc - push2::trackEncoderCC;
+        if (enc >= 0 && enc < push2::numTrackEncoders && enc < numSetups)
+        {
+            encoderMoved[(size_t) enc] = true;
+            if (volumeLocked[(size_t) enc])
+            {
+                lastEvent = "Volume " + setups[(size_t) enc].name + " bloccato";
+            }
+            else
+            {
+                volume[(size_t) enc] = juce::jlimit (0.0f, 1.0f,
+                                                     volume[(size_t) enc] + 0.01f * (float) push2::encoderDelta (v));
+                lastEvent = "Volume " + setups[(size_t) enc].name + " "
+                          + juce::String (juce::roundToInt (volume[(size_t) enc] * 100.0f)) + "%";
+            }
+            renderDisplay();
+            updateStatus();
+            return;
+        }
+
         if (cc >= push2::upperDisplayButtonCC && cc < push2::upperDisplayButtonCC + numSetups)
         {
             if (v > 0)
@@ -350,8 +400,12 @@ void MainComponent::renderDisplay()
                                                          devices::launchkey61Mk2(), devices::keystation88Mk3() };
     std::vector<ScreenSetup> list;
     for (const auto& s : setups)
-        list.push_back ({ s.name, deviceNames[(size_t) s.device], s.colour, s.nameFace });
-    display.setImage (renderScreen (list, activeSetup, devices::launchpadMiniMk1(),
+    {
+        const auto i = (size_t) (&s - setups.data());
+        list.push_back ({ s.name, deviceNames[(size_t) s.device], s.colour, s.nameFace,
+                          volume[i], volumeLocked[i] });
+    }
+    display.setImage (renderScreen (list, activeSetup, touchedEncoder, devices::launchpadMiniMk1(),
                                     firmware ? firmware->upToFirstOccurrenceOf (" ", false, false) : juce::String(), faces));
     repaint();
 }

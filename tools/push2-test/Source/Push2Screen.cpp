@@ -51,6 +51,21 @@ juce::Image shrinkMask (const juce::Image& src, int w, int h)
     }
     return out;
 }
+// Lucchetto minuscolo: corpo pieno e staffa ad arco
+void drawPadlock (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour c)
+{
+    const float bodyH = r.getHeight() * 0.55f;
+    juce::Rectangle<float> body (r.getX(), r.getBottom() - bodyH, r.getWidth(), bodyH);
+    g.setColour (c);
+    g.fillRoundedRectangle (body, r.getWidth() * 0.18f);
+
+    juce::Path shackle;
+    const float sw = r.getWidth() * 0.56f;
+    shackle.addCentredArc (r.getCentreX(), body.getY(), sw * 0.5f, r.getHeight() * 0.3f,
+                           0.0f, -juce::MathConstants<float>::halfPi,
+                           juce::MathConstants<float>::halfPi, true);
+    g.strokePath (shackle, juce::PathStrokeType (juce::jmax (1.0f, r.getWidth() * 0.18f)));
+}
 } // namespace
 
 namespace devices
@@ -196,7 +211,7 @@ float drawStyledText (juce::Graphics& g, const StyledText& parts, float x, float
     return x - startX;
 }
 
-juce::Image renderScreen (const std::vector<ScreenSetup>& setups, int active,
+juce::Image renderScreen (const std::vector<ScreenSetup>& setups, int active, int touched,
                           const StyledText& setupChanger,
                           const juce::String& firmware, const Faces& faces)
 {
@@ -204,13 +219,15 @@ juce::Image renderScreen (const std::vector<ScreenSetup>& setups, int active,
     juce::Graphics g (img);
     g.fillAll (juce::Colours::black);
 
-    // In alto: una casella per tasto sopra il display (120 px l'una)
+    // In alto: una casella per ogni rotativo e per il tasto sotto di esso.
+    // Nome del setup, sotto la barra del volume e il lucchetto se e' bloccato.
     const int cellWidth = push2::displayWidth / 8;
     for (int i = 0; i < (int) setups.size() && i < 8; ++i)
     {
-        juce::Rectangle<float> cell ((float) (i * cellWidth + 4), 4.0f, (float) (cellWidth - 8), 30.0f);
+        juce::Rectangle<float> cell ((float) (i * cellWidth + 4), 3.0f, (float) (cellWidth - 8), 36.0f);
         const auto& s = setups[(size_t) i];
         const bool on = (i == active);
+        const bool hand = (i == touched);
 
         if (on)
         {
@@ -219,20 +236,35 @@ juce::Image renderScreen (const std::vector<ScreenSetup>& setups, int active,
         }
         else
         {
-            g.setColour (s.colour.withMultipliedBrightness (0.6f));
-            g.drawRect (cell, 1.0f);
+            g.setColour (s.colour.withMultipliedBrightness (hand ? 1.0f : 0.6f));
+            g.drawRect (cell, hand ? 2.0f : 1.0f);
         }
 
-        const auto label = cellName (s.plugin, on ? juce::Colours::black : s.colour.withMultipliedBrightness (0.85f));
-        const float h = 24.0f;
+        const auto ink = on ? juce::Colours::black : s.colour.withMultipliedBrightness (0.85f);
+        const auto label = cellName (s.plugin, ink);
+        const float h = 22.0f;
         const float w = drawStyledText (g, label, 0, 0, h, faces, false);
-        drawStyledText (g, label, cell.getCentreX() - w * 0.5f, cell.getCentreY() + h * 0.36f, h, faces);
+        drawStyledText (g, label, cell.getCentreX() - w * 0.5f, cell.getY() + 20.0f, h, faces);
+
+        // barra del volume, con spazio fisso a destra per il lucchetto
+        const float lockW = 7.0f;
+        juce::Rectangle<float> bar (cell.getX() + 5.0f, cell.getBottom() - 9.0f,
+                                    cell.getWidth() - 10.0f - lockW - 4.0f, 5.0f);
+        g.setColour (ink.withAlpha (0.25f));
+        g.fillRect (bar);
+        g.setColour (ink);
+        g.fillRect (bar.withWidth (bar.getWidth() * juce::jlimit (0.0f, 1.0f, s.volume)));
+
+        if (s.locked)
+            drawPadlock (g, { bar.getRight() + 4.0f, bar.getBottom() - 9.0f, lockW, 9.0f }, ink);
     }
 
-    // Al centro: plugin e periferica
-    if (active >= 0 && active < (int) setups.size())
+    // Al centro: di norma plugin e periferica; mentre si tocca un rotativo,
+    // il setup di quel rotativo e il suo volume
+    const int middle = touched >= 0 && touched < (int) setups.size() ? touched : active;
+    if (middle >= 0 && middle < (int) setups.size())
     {
-        const auto& s = setups[(size_t) active];
+        const auto& s = setups[(size_t) middle];
         const auto name = s.nameFace == TextPart::Face::logoBold
                             ? logoStyleName (s.plugin, s.colour)
                             : brandName (s.plugin, s.colour, s.nameFace);
@@ -241,7 +273,15 @@ juce::Image renderScreen (const std::vector<ScreenSetup>& setups, int active,
         const float gap = s.nameFace == TextPart::Face::script ? 46.0f : 30.0f;
         float nameH = 66.0f;
 
-        const float devW = s.device.empty() ? 0.0f : drawStyledText (g, s.device, 0, 0, deviceH, faces, false);
+        StyledText right = s.device;
+        if (touched >= 0)
+        {
+            right = { part (juce::String (juce::roundToInt (s.volume * 100.0f)) + "%", Style::bold) };
+            if (s.locked)
+                right.push_back (part ("BLOCCATO", Style::inverted, 0.3f, white, 0.5f));
+        }
+
+        const float devW = right.empty() ? 0.0f : drawStyledText (g, right, 0, 0, deviceH, faces, false);
         float nameW = drawStyledText (g, name, 0, 0, nameH, faces, false);
         const float room = 920.0f - (devW > 0 ? gap + devW : 0.0f);
         if (nameW > room) // nomi lunghi: rimpicciolisce solo il nome
@@ -257,7 +297,7 @@ juce::Image renderScreen (const std::vector<ScreenSetup>& setups, int active,
         {
             g.setColour (juce::Colour (0xff444444));
             g.fillRect (x + gap * 0.5f - 1.0f, baseline - 52.0f, 2.0f, 52.0f);
-            drawStyledText (g, s.device, x + gap, baseline, deviceH, faces);
+            drawStyledText (g, right, x + gap, baseline, deviceH, faces);
         }
     }
 
