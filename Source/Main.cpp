@@ -1,5 +1,6 @@
 #include <juce_gui_extra/juce_gui_extra.h>
 #include "control/LaunchpadController.h"
+#include "control/Push2Controller.h"
 #include "control/SurfaceCoordinator.h"
 #include "engine/StageEngine.h"
 #include "patches/PatchManager.h"
@@ -69,6 +70,9 @@ public:
         launchpad = std::make_unique<LaunchpadController>();
         coordinator->addSurface (*launchpad);
 
+        push2 = std::make_unique<Push2Controller> (lookAndFeel.getTypefaceForFont (juce::Font (juce::FontOptions())));
+        coordinator->addSurface (*push2);
+
         auto content = std::make_unique<MainComponent> (*engine, *catalog, *patches, library, *coordinator);
         content->onLibraryChanged = [this] { saveLibrary(); };
         auto* contentPtr = content.get();
@@ -84,6 +88,7 @@ public:
         mainWindow = nullptr;   // chiude prima le finestre dei plugin
         coordinator = nullptr;
         launchpad = nullptr;
+        push2 = nullptr;
         if (patches != nullptr)
             saveLibrary();
         patches = nullptr;
@@ -127,6 +132,7 @@ private:
     std::unique_ptr<StageEngine> engine;
     std::unique_ptr<PatchManager> patches;
     std::unique_ptr<LaunchpadController> launchpad;
+    std::unique_ptr<Push2Controller> push2;
     std::unique_ptr<SurfaceCoordinator> coordinator;
     std::unique_ptr<MainWindow> mainWindow;
 };

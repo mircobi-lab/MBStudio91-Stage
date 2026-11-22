@@ -23,8 +23,9 @@ void addStageFormats (juce::AudioPluginFormatManager& fm)
 class PluginCatalog::ScanThread final : public juce::Thread
 {
 public:
-    ScanThread (PluginCatalog& c, std::function<void (int, juce::StringArray)> done)
-        : juce::Thread ("MBStudio91 Stage plugin scan"), catalog (c), onDone (std::move (done)) {}
+    ScanThread (PluginCatalog& c, juce::StringArray extra, std::function<void (int, juce::StringArray)> done)
+        : juce::Thread ("MBStudio91 Stage plugin scan"), catalog (c),
+          extraFolders (std::move (extra)), onDone (std::move (done)) {}
 
     ~ScanThread() override { stopThread (30000); }
 
@@ -36,7 +37,7 @@ public:
         for (auto* format : catalog.formatManager.getFormats())
         {
             juce::PluginDirectoryScanner scanner (catalog.knownList, *format,
-                                                  format->getDefaultLocationsToSearch(),
+                                                  PluginCatalog::searchPathFor (*format, extraFolders),
                                                   true, catalog.deadMansPedal, false);
             juce::String name;
             while (! threadShouldExit() && scanner.scanNextFile (true, name)) {}
@@ -59,6 +60,7 @@ public:
 
 private:
     PluginCatalog& catalog;
+    juce::StringArray extraFolders;
     std::function<void (int, juce::StringArray)> onDone;
 
     JUCE_DECLARE_WEAK_REFERENCEABLE (ScanThread)
@@ -74,6 +76,45 @@ PluginCatalog::PluginCatalog (juce::File list, juce::File pedal)
 PluginCatalog::~PluginCatalog()
 {
     scanThread = nullptr;
+}
+
+// Alle AudioUnit non servono cartelle: le trova il sistema. Le cartelle in piu'
+// valgono solo per i formati che cercano file, cioe' VST3.
+juce::FileSearchPath PluginCatalog::searchPathFor (juce::AudioPluginFormat& format,
+                                                   const juce::StringArray& extra)
+{
+    auto path = format.getDefaultLocationsToSearch();
+    if (path.getNumPaths() == 0)
+        return path;
+
+    for (const auto& f : extra)
+    {
+        const juce::File dir (f);
+        if (dir.isDirectory())
+            path.addIfNotAlreadyThere (dir);
+    }
+    return path;
+}
+
+void PluginCatalog::setExtraFolders (juce::StringArray folders)
+{
+    folders.removeEmptyStrings();
+    folders.removeDuplicates (true);
+    extraFolders = std::move (folders);
+}
+
+juce::StringArray PluginCatalog::getExtraFolders() const { return extraFolders; }
+
+juce::StringArray PluginCatalog::foldersToScan() const
+{
+    juce::StringArray all;
+    for (auto* format : formatManager.getFormats())
+    {
+        const auto path = searchPathFor (*format, extraFolders);
+        for (int i = 0; i < path.getNumPaths(); ++i)
+            all.addIfNotAlreadyThere (path[i].getFullPathName());
+    }
+    return all;
 }
 
 juce::AudioPluginFormatManager& PluginCatalog::formats() { return formatManager; }
@@ -100,7 +141,7 @@ void PluginCatalog::scanAsync (std::function<void (int, juce::StringArray)> onDo
         return;
 
     knownList.setCustomScanner (ScannerProcess::makeOutOfProcessScanner());
-    scanThread = std::make_unique<ScanThread> (*this, std::move (onDone));
+    scanThread = std::make_unique<ScanThread> (*this, extraFolders, std::move (onDone));
     scanThread->startThread();
 }
 
