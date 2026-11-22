@@ -79,6 +79,21 @@ Se il Push non e' collegato, il display va lo stesso sul visore di
 
 I VST suonano dal vivo e basta: Stage non registra e non crea tracce.
 
+## Scegliere i plugin da scansionare
+
+Aprire un plugin per esaminarlo e' la parte lenta: con molti plugin installati la
+scansione puo' durare parecchio, e un plugin che non risponde si porta via fino a due
+minuti da solo prima di essere scartato.
+
+Per questo il tasto SCANSIONA PLUGIN apre un menu con **Scegli i plugin da
+scansionare**: legge i nomi dei file nelle cartelle, cosa immediata perche' non apre
+niente, e li mostra con le spunte. Si spuntano quelli che servono e si scansionano
+solo quelli. La scelta resta in `plugin-scelti.txt`, quindi le volte dopo non si
+rifa'. Nel menu c'e' anche "Scansiona tutto adesso" per battere ogni cartella.
+
+Durante la scansione la riga in basso dice a che punto e' e quale plugin sta aprendo,
+e dal menu si puo' fermare.
+
 ## Cartelle dei plugin
 
 Oltre alle cartelle standard del sistema puoi farne battere altre, per esempio quella

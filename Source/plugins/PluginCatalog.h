@@ -23,6 +23,21 @@ public:
     void load();
     void save() const;
 
+    // Un plugin trovato sul disco, senza averlo ancora aperto.
+    struct FoundPlugin
+    {
+        juce::String formatName, fileOrIdentifier, displayName;
+        juce::String key() const { return formatName + "|" + fileOrIdentifier; }
+        bool alreadyKnown = false;
+    };
+
+    // Legge soltanto le cartelle: non apre nessun plugin, quindi e' immediato e non puo' bloccarsi.
+    std::vector<FoundPlugin> findPluginFiles() const;
+
+    // Se e' vuota si scansiona tutto; altrimenti solo i plugin scelti (chiavi di FoundPlugin).
+    void setChosenPlugins (juce::StringArray keys);
+    juce::StringArray getChosenPlugins() const;
+
     // Cartelle in piu' da battere oltre a quelle standard del formato (le sue, dove
     // compila i plugin MBStudio91). Da impostare prima di scanAsync.
     void setExtraFolders (juce::StringArray folders);
@@ -34,6 +49,10 @@ public:
     // Scansione fuori processo, su un thread separato. onDone arriva sul message thread.
     void scanAsync (std::function<void (int found, juce::StringArray failed)> onDone);
     bool isScanning() const;
+    void stopScan();
+
+    // Avanzamento, chiamato sul message thread: quanti fatti su quanti e quale si sta aprendo.
+    std::function<void (int done, int total, juce::String name)> onScanProgress;
 
     std::optional<juce::PluginDescription> findByPortableId (const juce::String&) const;
 
@@ -50,7 +69,7 @@ private:
     juce::AudioPluginFormatManager formatManager;
     juce::KnownPluginList knownList;
     std::unique_ptr<ScanThread> scanThread;
-    juce::StringArray extraFolders;
+    juce::StringArray extraFolders, chosenPlugins;
 
     JUCE_DECLARE_NON_COPYABLE (PluginCatalog)
 };
