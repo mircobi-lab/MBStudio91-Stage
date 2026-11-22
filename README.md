@@ -144,6 +144,11 @@ cmake --build build --target MBStudio91Stage --config Release
 
 I test: `cmake --build build --target StageTests` e poi `ctest --test-dir build`.
 
+CMake si scarica da solo JUCE e libusb, quest'ultima serve al display del Push 2.
+Su Linux, dove i test girano volentieri, libusb vuole `libudev` che spesso non c'e':
+in quel caso aggiungi `-DLIBUSB_ENABLE_UDEV=OFF` al comando di configurazione. Su
+macOS non serve, perche' libusb usa il suo backend Darwin.
+
 ## Licenze
 
 Basato su [JUCE](https://juce.com) 8. Il font Bebas Neue (Dharma Type) è distribuito con licenza SIL Open Font License 1.1, testo in `Assets/Fonts/OFL.txt`.
