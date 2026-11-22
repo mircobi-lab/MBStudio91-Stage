@@ -56,13 +56,36 @@ struct ScreenSetup
     TextPart::Face nameFace = TextPart::Face::logoBold;
     float volume = 0.75f; // 0..1, dal rotativo sopra la casella
     bool locked = false;  // volume bloccato: il rotativo non lo muove piu'
+    bool muted = false;   // dal tasto sotto il display
+    int transpose = 0;    // ottave, dai tasti Octave
+};
+
+// Tutto quello che non appartiene a un singolo setup
+struct ScreenState
+{
+    int active = 0;
+    int touched = -1;         // rotativo tenuto col dito, -1 nessuno
+    float master = 1.0f;
+    bool masterMuted = false;
+    int bpm = 120;
+    bool metronome = false;
+    bool beat = false;        // lampeggio a tempo
+    int scene = -1;           // ultima scena richiamata
+    bool shift = false;
+    float strip = 0.5f;       // 0..1, posizione della striscia
+    bool stripTouched = false;
+    bool stripMod = false;    // false = pitch bend, true = mod wheel
+    bool polyAftertouch = false;
+    int aftertouch = 0;       // 0..127
+    bool sustain = false;     // pedale 1
+    int pedal2 = -1;          // -1 mai visto, altrimenti 0..127
+    bool pedal2Continuous = false;
+    juce::String firmware;
 };
 
 // Disegna la schermata 960x160 del Push 2
-// touched: indice del rotativo che si sta toccando, -1 se nessuno
-juce::Image renderScreen (const std::vector<ScreenSetup>& setups, int active, int touched,
-                          const StyledText& setupChanger,
-                          const juce::String& firmware, const Faces& faces);
+juce::Image renderScreen (const std::vector<ScreenSetup>& setups, const ScreenState& st,
+                          const StyledText& setupChanger, const Faces& faces);
 
 // Disegna una scritta composta con la base del testo a "baseline"; restituisce la larghezza.
 // Con draw = false misura soltanto.

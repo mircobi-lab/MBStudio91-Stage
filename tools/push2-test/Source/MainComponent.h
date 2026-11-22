@@ -45,6 +45,9 @@ private:
     void refreshLeds();
     void allLedsOff();
     void selectSetup (int index);
+    void recallScene (int index);
+    void storeScene (int index);
+    void configurePush();
     void renderDisplay();
 
     void updateStatus();
@@ -67,7 +70,16 @@ private:
     std::array<float, numSetups> volume {};
     std::array<bool, numSetups> volumeLocked {};
     std::array<bool, numSetups> encoderMoved {}; // girato mentre lo si teneva
+    std::array<bool, numSetups> muted {};
+    std::array<int, numSetups> transpose {};
+
+    struct Scene { std::array<float, numSetups> volume {}; std::array<bool, numSetups> muted {}; bool used = false; };
+    std::array<Scene, 8> scenes {};
+
+    ScreenState screen;
     int touchedEncoder = -1;
+    int soloed = -1;              // -1 nessuno
+    juce::int64 lastTap = 0;      // per il tap tempo
     juce::String lastEvent { "Premi un pad o un tasto sopra il display" };
 
     Push2Display display;

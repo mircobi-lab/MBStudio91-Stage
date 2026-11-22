@@ -4,21 +4,37 @@ App di prova per pilotare un Ableton Push 2 senza Live, in vista di MBStudio91 S
 
 Cosa fa:
 
-- legge firmware, numero di serie e revisione della scheda (Identity Request);
-- colora i 64 pad: la fila in basso ha un pad per ciascuno degli 8 setup, le altre righe prendono il colore del setup attivo;
-- gli 8 rotativi in alto regolano il volume del setup che hanno sotto, uno scatto = 1%;
-- toccando un rotativo senza girarlo il volume si blocca, toccandolo di nuovo si sblocca;
-  finche' e' bloccato il rotativo non lo muove e nella casella compare un lucchetto;
-- mentre si tiene un rotativo il centro del display mostra quel volume in percentuale;
-- la selezione del setup passa solo dal tasto con il LED sotto il rotativo
-  (i pad della fila in basso restano attivi per la prova);
-- un pad premuto diventa bianco finché lo tieni giù; in finestra compaiono nota e velocity;
-- encoder e altri tasti compaiono in finestra come numero di CC;
-- il display mostra le 8 caselle allineate ai rotativi, con nome e barra del volume,
-  il nome del setup attivo e il firmware;
-- il nome al centro segue lo stile del logo MBSTUDIO91 (solo l'iniziale spessa); Sylenth1 e
-  DUNE usano un carattere somigliante al loro marchio;
-- accanto al nome compare la tastiera abbinata, scritta come sul pannello.
+| Controllo sul Push 2 | MIDI | Funzione |
+|---|---|---|
+| 8 rotativi in alto | CC 71-78 | volume del setup sotto, uno scatto 1% |
+| tocco di un rotativo | note 0-7 | senza girarlo blocca o sblocca quel volume |
+| 8 tasti sopra il display | CC 102-109 | seleziona il setup |
+| 8 tasti sotto il display | CC 20-27 | mute del setup di quella colonna |
+| colonna a destra dei pad | CC 43 in alto ... 36 in basso | richiama una scena, con Shift la memorizza |
+| Shift | CC 49 | modificatore |
+| encoder Master | CC 79 | volume generale |
+| tasto Master | CC 28 | mute generale |
+| striscia a sinistra | nota 12, pitch bend o CC 1 | pitch bend oppure mod wheel |
+| Layout | CC 31 | commuta la striscia fra pitch bend e mod wheel |
+| pad | note 36-99 + aftertouch | note, con pressione mostrata a schermo |
+| Accent | CC 57 | aftertouch globale o per singolo pad |
+| pedale jack 1 (destro) | CC 64 | sustain |
+| pedale jack 2 (sinistro) | CC 69 | volume a pedale se e' di espressione, mute se e' a interruttore |
+| frecce su/giu | CC 46/47 | setup precedente e successivo |
+| frecce sinistra/destra | CC 44/45 | scena precedente e successiva |
+| Octave su/giu | CC 55/54 | traspone il setup attivo, fino a 4 ottave |
+| encoder Tempo | CC 14 | BPM |
+| Tap Tempo | CC 3 | batte il BPM a mano |
+| Metronome, Play, Stop | CC 9, 85, 29 | accende e spegne il lampeggio a tempo |
+| Mute, Solo | CC 60, 61 | mute e solo del setup attivo |
+
+Una scena e' una istantanea degli otto volumi e dei mute. Un volume bloccato non lo
+muove nemmeno una scena richiamata: resta dove l'hai messo.
+
+Il display mostra in alto le otto caselle con nome, barra del volume, lucchetto se il
+volume e' bloccato e nome barrato se il setup e' in mute; al centro il setup attivo con
+la tastiera abbinata, oppure il volume del rotativo che stai tenendo; poi una riga di
+stato con BPM, master, scena, striscia, aftertouch e pedali; in fondo il marchio.
 
 Usa solo comandi documentati da Ableton in
 [push-interface](https://github.com/Ableton/push-interface): numeri di pad, tasti e

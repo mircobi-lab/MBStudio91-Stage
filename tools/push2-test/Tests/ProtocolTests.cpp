@@ -40,6 +40,19 @@ int main()
     for (int n = trackEncoderTouchNote; n < trackEncoderTouchNote + numTrackEncoders; ++n)
         CHECK (! padPosition (n));
 
+    // Colonna delle scene: 43 in alto, 36 in basso, come nella figura di Ableton
+    CHECK (sceneButtonCC (0) == 43);
+    CHECK (sceneButtonCC (7) == 36);
+
+    // Esempi del manuale
+    CHECK (setAftertouchMode (true) == (Bytes { 0xF0, 0x00, 0x21, 0x1D, 0x01, 0x01, 0x1E, 0x01, 0xF7 }));
+    CHECK (setAftertouchMode (false) == (Bytes { 0xF0, 0x00, 0x21, 0x1D, 0x01, 0x01, 0x1E, 0x00, 0xF7 }));
+    CHECK (setTouchStripConfig (0x68) == (Bytes { 0xF0, 0x00, 0x21, 0x1D, 0x01, 0x01, 0x17, 0x68, 0xF7 }));
+    CHECK (stripPitchBend == 0x68 && stripModWheel == 0x0C);
+    // nessun comando sysex deve contenere byte con il bit alto, a parte F0 e F7
+    for (auto b : setTouchStripConfig (0xFF))
+        CHECK (b == 0xF0 || b == 0xF7 || b < 0x80);
+
     // Identity Reply letta dal Push 2 di Mirco (Mac mini, 21/11/2026)
     const std::uint8_t reply[] { 0xF0, 0x7E, 0x01, 0x06, 0x02, 0x00, 0x21, 0x1D, 0x67, 0x32, 0x02, 0x00,
                                  0x01, 0x00, 0x47, 0x00, 0x50, 0x4D, 0x5C, 0x08, 0x00, 0x01, 0xF7 };

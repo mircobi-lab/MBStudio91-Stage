@@ -50,6 +50,32 @@ constexpr int numTrackEncoders = 8;
 // Quanti scatti e in che verso: il valore e' relativo, in complemento a due
 int encoderDelta (int ccValue);
 
+constexpr int masterEncoderCC = 79;
+constexpr int tempoEncoderCC  = 14;
+constexpr int swingEncoderCC  = 15;
+
+// Colonna a destra dei pad: in Live lancia le scene. CC 36 e' in basso, 43 in alto.
+constexpr int numSceneButtons = 8;
+int sceneButtonCC (int rowFromTop); // 0 = in alto
+
+// Striscia verticale a sinistra dei pad: nota 12 al tocco, poi pitch bend
+// oppure CC 1 (mod wheel) secondo come e' configurata
+constexpr int touchStripNote = 12;
+constexpr int modWheelCC = 1;
+constexpr std::uint8_t stripPitchBend = 0x68; // di serie: punto, ritorno al centro
+constexpr std::uint8_t stripModWheel  = 0x0C; // barra dal basso, senza ritorno
+
+// Pedali: jack 1 (a destra, vicino all'interruttore) e jack 2 (a sinistra)
+constexpr int pedal1CC = 64; // Sustain
+constexpr int pedal2CC = 69; // Hold 2
+
+// Altri tasti usati
+constexpr int shiftCC = 49, masterCC = 28, tapTempoCC = 3, metronomeCC = 9;
+constexpr int playCC = 85, stopCC = 29, muteCC = 60, soloCC = 61;
+constexpr int leftCC = 44, rightCC = 45, upCC = 46, downCC = 47;
+constexpr int octaveDownCC = 54, octaveUpCC = 55;
+
+
 // Indici della palette di fabbrica garantiti dal manuale
 constexpr int colourBlack = 0;
 constexpr int colourWhite = 122;
@@ -57,7 +83,9 @@ constexpr int colourRed   = 127;
 
 using Bytes = std::vector<std::uint8_t>;
 
-Bytes identityRequest();                     // F0 7E 01 06 01 F7
+Bytes identityRequest();
+Bytes setAftertouchMode (bool polyphonic);       // comando 0x1E: 0 = channel pressure, 1 = poly
+Bytes setTouchStripConfig (std::uint8_t flags);  // comando 0x17: vedi stripPitchBend / stripModWheel                     // F0 7E 01 06 01 F7
 Bytes setPaletteEntry (int index, std::uint8_t r, std::uint8_t g, std::uint8_t b, std::uint8_t w);
 Bytes reapplyPalette();                      // comando 0x05
 Bytes setLedBrightness (int value);          // comando 0x06, 0..127 (a USB il Push limita a 8)

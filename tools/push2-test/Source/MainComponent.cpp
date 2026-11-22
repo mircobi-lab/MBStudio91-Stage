@@ -1,6 +1,8 @@
 #include "MainComponent.h"
 #include "Push2Protocol.h"
 
+#include <cmath>
+
 #include "BinaryData.h"
 
 namespace
@@ -112,6 +114,7 @@ bool MainComponent::connectMidi()
     firmware.reset();
 
     sendSysex (push2::identityRequest());
+    configurePush();
     // Salva le voci di palette che andiamo a cambiare, per rimetterle a posto all'uscita
     for (int i = firstPaletteIndex; i < firstPaletteIndex + 2 * numSetups; ++i)
         sendSysex ({ 0xF0, 0x00, 0x21, 0x1D, 0x01, 0x01, 0x04, (std::uint8_t) i, 0xF7 });
@@ -183,6 +186,32 @@ void MainComponent::handleMessage (const juce::MidiMessage& m)
             entry[6] = 0x03; // stessa voce, comando "Set"
             paletteBackup[d[6]] = entry;
         }
+        return;
+    }
+
+    // Striscia a sinistra dei pad: nota 12 al tocco, poi pitch bend o CC 1
+    if ((m.isNoteOn() || m.isNoteOff()) && m.getNoteNumber() == push2::touchStripNote)
+    {
+        screen.stripTouched = m.isNoteOn() && m.getVelocity() > 0;
+        if (! screen.stripTouched && ! screen.stripMod)
+            screen.strip = 0.5f; // in modo pitch bend la striscia torna al centro da sola
+        lastEvent = juce::String ("Striscia ") + (screen.stripTouched ? "toccata" : "lasciata");
+        renderDisplay();
+        updateStatus();
+        return;
+    }
+
+    if (m.isPitchWheel())
+    {
+        screen.strip = juce::jlimit (0.0f, 1.0f, (float) m.getPitchWheelValue() / 16383.0f);
+        renderDisplay();
+        return;
+    }
+
+    if (m.isChannelPressure() || m.isAftertouch())
+    {
+        screen.aftertouch = m.isChannelPressure() ? m.getChannelPressureValue() : m.getAfterTouchValue();
+        renderDisplay();
         return;
     }
 
@@ -273,6 +302,203 @@ void MainComponent::handleMessage (const juce::MidiMessage& m)
                 selectSetup (cc - push2::upperDisplayButtonCC);
             return;
         }
+
+        // Fila sotto il display: mute del setup di quella colonna
+        if (cc >= push2::lowerDisplayButtonCC && cc < push2::lowerDisplayButtonCC + numSetups)
+        {
+            if (v > 0)
+            {
+                const auto i = (size_t) (cc - push2::lowerDisplayButtonCC);
+                muted[i] = ! muted[i];
+                lastEvent = setups[i].name + (muted[i] ? " in mute" : " acceso");
+                refreshLeds();
+                renderDisplay();
+                updateStatus();
+            }
+            return;
+        }
+
+        // Colonna a destra dei pad: richiama una scena, con Shift la memorizza
+        for (int row = 0; row < push2::numSceneButtons; ++row)
+            if (cc == push2::sceneButtonCC (row))
+            {
+                if (v > 0)
+                {
+                    if (screen.shift)
+                        storeScene (row);
+                    else
+                        recallScene (row);
+                }
+                return;
+            }
+
+        switch (cc)
+        {
+            case push2::shiftCC:
+                screen.shift = v > 0;
+                renderDisplay();
+                return;
+
+            case push2::masterEncoderCC:
+                screen.master = juce::jlimit (0.0f, 1.0f, screen.master + 0.01f * (float) push2::encoderDelta (v));
+                lastEvent = "Master " + juce::String (juce::roundToInt (screen.master * 100.0f)) + "%";
+                renderDisplay();
+                updateStatus();
+                return;
+
+            case push2::masterCC:
+                if (v > 0)
+                {
+                    screen.masterMuted = ! screen.masterMuted;
+                    lastEvent = screen.masterMuted ? "Master in mute" : "Master acceso";
+                    refreshLeds();
+                    renderDisplay();
+                    updateStatus();
+                }
+                return;
+
+            case push2::tempoEncoderCC:
+                screen.bpm = juce::jlimit (20, 300, screen.bpm + push2::encoderDelta (v));
+                lastEvent = "BPM " + juce::String (screen.bpm);
+                renderDisplay();
+                updateStatus();
+                return;
+
+            case push2::tapTempoCC:
+                if (v > 0)
+                {
+                    const auto now = juce::Time::currentTimeMillis();
+                    const auto gap = now - lastTap;
+                    if (lastTap > 0 && gap > 200 && gap < 3000)
+                    {
+                        screen.bpm = juce::jlimit (20, 300, (int) juce::roundToInt (60000.0 / (double) gap));
+                        lastEvent = "BPM " + juce::String (screen.bpm) + " battuto a mano";
+                    }
+                    lastTap = now;
+                    renderDisplay();
+                    updateStatus();
+                }
+                return;
+
+            case push2::metronomeCC:
+            case push2::playCC:
+                if (v > 0)
+                {
+                    screen.metronome = cc == push2::playCC ? true : ! screen.metronome;
+                    refreshLeds();
+                    renderDisplay();
+                }
+                return;
+
+            case push2::stopCC:
+                if (v > 0)
+                {
+                    screen.metronome = false;
+                    screen.beat = false;
+                    refreshLeds();
+                    renderDisplay();
+                }
+                return;
+
+            case push2::muteCC:
+                if (v > 0)
+                {
+                    muted[(size_t) activeSetup] = ! muted[(size_t) activeSetup];
+                    refreshLeds();
+                    renderDisplay();
+                }
+                return;
+
+            case push2::soloCC:
+                if (v > 0)
+                {
+                    soloed = (soloed == activeSetup) ? -1 : activeSetup;
+                    refreshLeds();
+                    renderDisplay();
+                }
+                return;
+
+            case push2::upCC:
+                if (v > 0) selectSetup (activeSetup - 1);
+                return;
+            case push2::downCC:
+                if (v > 0) selectSetup (activeSetup + 1);
+                return;
+            case push2::leftCC:
+                if (v > 0) recallScene (juce::jmax (0, screen.scene - 1));
+                return;
+            case push2::rightCC:
+                if (v > 0) recallScene (juce::jmin (7, screen.scene + 1));
+                return;
+
+            case push2::octaveUpCC:
+            case push2::octaveDownCC:
+                if (v > 0)
+                {
+                    auto& t = transpose[(size_t) activeSetup];
+                    t = juce::jlimit (-4, 4, t + (cc == push2::octaveUpCC ? 1 : -1));
+                    lastEvent = setups[(size_t) activeSetup].name + " trasposto di " + juce::String (t) + " ottave";
+                    renderDisplay();
+                    updateStatus();
+                }
+                return;
+
+            case 31: // Layout: striscia pitch bend o mod wheel
+                if (v > 0)
+                {
+                    screen.stripMod = ! screen.stripMod;
+                    screen.strip = screen.stripMod ? 0.0f : 0.5f;
+                    configurePush();
+                    lastEvent = juce::String ("Striscia in ") + (screen.stripMod ? "mod wheel" : "pitch bend");
+                    renderDisplay();
+                    updateStatus();
+                }
+                return;
+
+            case 57: // Accent: aftertouch per pad o globale
+                if (v > 0)
+                {
+                    screen.polyAftertouch = ! screen.polyAftertouch;
+                    configurePush();
+                    lastEvent = juce::String ("Aftertouch ") + (screen.polyAftertouch ? "per pad" : "globale");
+                    renderDisplay();
+                    updateStatus();
+                }
+                return;
+
+            case push2::modWheelCC: // la striscia in modo mod wheel
+                screen.strip = (float) v / 127.0f;
+                renderDisplay();
+                return;
+
+            case push2::pedal1CC:
+                screen.sustain = v >= 64;
+                lastEvent = screen.sustain ? "Sustain premuto" : "Sustain rilasciato";
+                renderDisplay();
+                updateStatus();
+                return;
+
+            case push2::pedal2CC:
+                if (v != 0 && v != 127)
+                    screen.pedal2Continuous = true; // e' un pedale di espressione, non un interruttore
+                screen.pedal2 = v;
+                if (screen.pedal2Continuous)
+                {
+                    if (! volumeLocked[(size_t) activeSetup])
+                        volume[(size_t) activeSetup] = (float) v / 127.0f;
+                }
+                else if (v > 0)
+                {
+                    muted[(size_t) activeSetup] = ! muted[(size_t) activeSetup];
+                    refreshLeds();
+                }
+                renderDisplay();
+                updateStatus();
+                return;
+
+            default:
+                break;
+        }
         // Gli altri controlli (encoder, tasti) li mostro e basta: utile per capire la mappa
         lastEvent = "CC " + juce::String (cc) + "   valore " + juce::String (v);
         updateStatus();
@@ -311,6 +537,24 @@ void MainComponent::timerCallback()
                 renderDisplay();
             }
         }
+    }
+
+    // lampeggio a tempo: due accensioni per battuta bastano a vedere il BPM
+    if (screen.metronome)
+    {
+        const double beatMs = 60000.0 / juce::jmax (1, screen.bpm);
+        const double phase = std::fmod ((double) juce::Time::currentTimeMillis(), beatMs) / beatMs;
+        const bool on = phase < 0.3;
+        if (on != screen.beat)
+        {
+            screen.beat = on;
+            renderDisplay();
+        }
+    }
+    else if (screen.beat)
+    {
+        screen.beat = false;
+        renderDisplay();
     }
 
     if (display.getState() != shownDisplayState)
@@ -354,7 +598,14 @@ void MainComponent::allLedsOff()
     for (int note = 36; note <= 99; ++note)
         send (juce::MidiMessage::noteOn (1, note, (juce::uint8) push2::colourBlack));
     for (int i = 0; i < numSetups; ++i)
+    {
         send (juce::MidiMessage::controllerEvent (1, push2::upperDisplayButtonCC + i, push2::colourBlack));
+        send (juce::MidiMessage::controllerEvent (1, push2::lowerDisplayButtonCC + i, push2::colourBlack));
+    }
+    for (int row = 0; row < push2::numSceneButtons; ++row)
+        send (juce::MidiMessage::controllerEvent (1, push2::sceneButtonCC (row), push2::colourBlack));
+    for (int cc : { push2::masterCC, push2::metronomeCC, push2::muteCC, push2::soloCC, push2::playCC })
+        send (juce::MidiMessage::controllerEvent (1, cc, 0));
 }
 
 void MainComponent::refreshLeds()
@@ -381,8 +632,73 @@ void MainComponent::refreshLeds()
         }
 
     for (int i = 0; i < numSetups; ++i)
+    {
         send (juce::MidiMessage::controllerEvent (1, push2::upperDisplayButtonCC + i,
                                                   i == activeSetup ? push2::colourWhite : firstPaletteIndex + numSetups + i));
+        // fila sotto il display: acceso quando il setup suona, spento in mute
+        send (juce::MidiMessage::controllerEvent (1, push2::lowerDisplayButtonCC + i,
+                                                  muted[(size_t) i] ? push2::colourBlack : firstPaletteIndex + i));
+    }
+
+    // colonna delle scene: bianca quella richiamata, tenue quelle memorizzate
+    for (int row = 0; row < push2::numSceneButtons; ++row)
+    {
+        const int colour = row == screen.scene      ? push2::colourWhite
+                         : scenes[(size_t) row].used ? firstPaletteIndex + numSetups
+                                                     : push2::colourBlack;
+        send (juce::MidiMessage::controllerEvent (1, push2::sceneButtonCC (row), colour));
+    }
+
+    // tasti con LED bianco: acceso o spento
+    auto white = [this] (int cc, bool on)
+    { send (juce::MidiMessage::controllerEvent (1, cc, on ? 127 : 0)); };
+    white (push2::masterCC, screen.masterMuted);
+    white (push2::metronomeCC, screen.metronome);
+    send (juce::MidiMessage::controllerEvent (1, push2::muteCC,
+                                              muted[(size_t) activeSetup] ? push2::colourRed : push2::colourBlack));
+    send (juce::MidiMessage::controllerEvent (1, push2::soloCC,
+                                              soloed >= 0 ? push2::colourWhite : push2::colourBlack));
+    send (juce::MidiMessage::controllerEvent (1, push2::playCC,
+                                              screen.metronome ? push2::colourWhite : push2::colourBlack));
+}
+
+void MainComponent::configurePush()
+{
+    sendSysex (push2::setTouchStripConfig (screen.stripMod ? push2::stripModWheel : push2::stripPitchBend));
+    sendSysex (push2::setAftertouchMode (screen.polyAftertouch));
+}
+
+void MainComponent::storeScene (int index)
+{
+    auto& sc = scenes[(size_t) index];
+    sc.volume = volume;
+    sc.muted = muted;
+    sc.used = true;
+    screen.scene = index;
+    lastEvent = "Scena " + juce::String (index + 1) + " memorizzata";
+    refreshLeds();
+    renderDisplay();
+    updateStatus();
+}
+
+void MainComponent::recallScene (int index)
+{
+    const auto& sc = scenes[(size_t) index];
+    if (! sc.used)
+    {
+        lastEvent = "Scena " + juce::String (index + 1) + " vuota: tienila con Shift per memorizzarla";
+        updateStatus();
+        return;
+    }
+    for (int i = 0; i < numSetups; ++i)
+        if (! volumeLocked[(size_t) i]) // un volume bloccato non lo tocca nemmeno la scena
+            volume[(size_t) i] = sc.volume[(size_t) i];
+    muted = sc.muted;
+    screen.scene = index;
+    lastEvent = "Scena " + juce::String (index + 1) + " richiamata";
+    refreshLeds();
+    renderDisplay();
+    updateStatus();
 }
 
 void MainComponent::selectSetup (int index)
@@ -402,11 +718,15 @@ void MainComponent::renderDisplay()
     for (const auto& s : setups)
     {
         const auto i = (size_t) (&s - setups.data());
+        const bool off = muted[i] || (soloed >= 0 && soloed != (int) i);
         list.push_back ({ s.name, deviceNames[(size_t) s.device], s.colour, s.nameFace,
-                          volume[i], volumeLocked[i] });
+                          volume[i], volumeLocked[i], off, transpose[i] });
     }
-    display.setImage (renderScreen (list, activeSetup, touchedEncoder, devices::launchpadMiniMk1(),
-                                    firmware ? firmware->upToFirstOccurrenceOf (" ", false, false) : juce::String(), faces));
+
+    screen.active = activeSetup;
+    screen.touched = touchedEncoder;
+    screen.firmware = firmware ? firmware->upToFirstOccurrenceOf (" ", false, false) : juce::String();
+    display.setImage (renderScreen (list, screen, devices::launchpadMiniMk1(), faces));
     repaint();
 }
 

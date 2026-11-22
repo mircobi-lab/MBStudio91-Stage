@@ -211,46 +211,55 @@ float drawStyledText (juce::Graphics& g, const StyledText& parts, float x, float
     return x - startX;
 }
 
-juce::Image renderScreen (const std::vector<ScreenSetup>& setups, int active, int touched,
-                          const StyledText& setupChanger,
-                          const juce::String& firmware, const Faces& faces)
+juce::Image renderScreen (const std::vector<ScreenSetup>& setups, const ScreenState& st,
+                          const StyledText& setupChanger, const Faces& faces)
 {
     juce::Image img (juce::Image::RGB, push2::displayWidth, push2::displayHeight, true);
     juce::Graphics g (img);
     g.fillAll (juce::Colours::black);
 
+    const juce::Colour dim { 0xff7a7a7a }, bright { 0xfff3f3f1 };
+
     // In alto: una casella per ogni rotativo e per il tasto sotto di esso.
-    // Nome del setup, sotto la barra del volume e il lucchetto se e' bloccato.
+    // Nome del setup, barra del volume, lucchetto se bloccato, barrato se in mute.
     const int cellWidth = push2::displayWidth / 8;
     for (int i = 0; i < (int) setups.size() && i < 8; ++i)
     {
         juce::Rectangle<float> cell ((float) (i * cellWidth + 4), 3.0f, (float) (cellWidth - 8), 36.0f);
         const auto& s = setups[(size_t) i];
-        const bool on = (i == active);
-        const bool hand = (i == touched);
+        const bool on = (i == st.active);
+        const bool hand = (i == st.touched);
 
         if (on)
         {
-            g.setColour (s.colour);
+            g.setColour (s.colour.withMultipliedBrightness (s.muted ? 0.45f : 1.0f));
             g.fillRect (cell);
         }
         else
         {
-            g.setColour (s.colour.withMultipliedBrightness (hand ? 1.0f : 0.6f));
+            g.setColour (s.colour.withMultipliedBrightness (hand ? 1.0f : s.muted ? 0.3f : 0.6f));
             g.drawRect (cell, hand ? 2.0f : 1.0f);
         }
 
-        const auto ink = on ? juce::Colours::black : s.colour.withMultipliedBrightness (0.85f);
+        auto ink = on ? juce::Colours::black : s.colour.withMultipliedBrightness (0.85f);
+        if (s.muted)
+            ink = ink.withAlpha (0.5f);
+
         const auto label = cellName (s.plugin, ink);
         const float h = 22.0f;
         const float w = drawStyledText (g, label, 0, 0, h, faces, false);
-        drawStyledText (g, label, cell.getCentreX() - w * 0.5f, cell.getY() + 20.0f, h, faces);
+        const float lx = cell.getCentreX() - w * 0.5f;
+        drawStyledText (g, label, lx, cell.getY() + 20.0f, h, faces);
+        if (s.muted) // riga sopra il nome: muto
+        {
+            g.setColour (ink);
+            g.fillRect (lx, cell.getY() + 13.0f, w, 1.5f);
+        }
 
-        // barra del volume, con spazio fisso a destra per il lucchetto
         const float lockW = 7.0f;
         juce::Rectangle<float> bar (cell.getX() + 5.0f, cell.getBottom() - 9.0f,
                                     cell.getWidth() - 10.0f - lockW - 4.0f, 5.0f);
-        g.setColour (ink.withAlpha (0.25f));
+        g.setColour (ink.withMultipliedAlpha (0.25f));
         g.fillRect (bar);
         g.setColour (ink);
         g.fillRect (bar.withWidth (bar.getWidth() * juce::jlimit (0.0f, 1.0f, s.volume)));
@@ -259,26 +268,31 @@ juce::Image renderScreen (const std::vector<ScreenSetup>& setups, int active, in
             drawPadlock (g, { bar.getRight() + 4.0f, bar.getBottom() - 9.0f, lockW, 9.0f }, ink);
     }
 
-    // Al centro: di norma plugin e periferica; mentre si tocca un rotativo,
-    // il setup di quel rotativo e il suo volume
-    const int middle = touched >= 0 && touched < (int) setups.size() ? touched : active;
+    // Al centro: di norma plugin e periferica; tenendo un rotativo, quel volume
+    const int middle = st.touched >= 0 && st.touched < (int) setups.size() ? st.touched : st.active;
     if (middle >= 0 && middle < (int) setups.size())
     {
         const auto& s = setups[(size_t) middle];
         const auto name = s.nameFace == TextPart::Face::logoBold
                             ? logoStyleName (s.plugin, s.colour)
                             : brandName (s.plugin, s.colour, s.nameFace);
-        const float deviceH = 34.0f, baseline = 104.0f;
-        // lo script sporge a destra per via dell'inclinazione: gli lascio piu' spazio
-        const float gap = s.nameFace == TextPart::Face::script ? 46.0f : 30.0f;
-        float nameH = 66.0f;
+        const float deviceH = 30.0f, baseline = 92.0f;
+        const float gap = s.nameFace == TextPart::Face::script ? 42.0f : 28.0f;
+        float nameH = 56.0f;
 
-        StyledText right = s.device;
-        if (touched >= 0)
+        StyledText right;
+        if (st.touched >= 0)
         {
             right = { part (juce::String (juce::roundToInt (s.volume * 100.0f)) + "%", Style::bold) };
             if (s.locked)
                 right.push_back (part ("BLOCCATO", Style::inverted, 0.3f, white, 0.5f));
+        }
+        else
+        {
+            right = s.device;
+            if (s.transpose != 0)
+                right.push_back (part ((s.transpose > 0 ? "+" : "") + juce::String (s.transpose) + " OTT",
+                                       Style::inverted, 0.3f, white, 0.5f));
         }
 
         const float devW = right.empty() ? 0.0f : drawStyledText (g, right, 0, 0, deviceH, faces, false);
@@ -296,19 +310,63 @@ juce::Image renderScreen (const std::vector<ScreenSetup>& setups, int active, in
         if (devW > 0)
         {
             g.setColour (juce::Colour (0xff444444));
-            g.fillRect (x + gap * 0.5f - 1.0f, baseline - 52.0f, 2.0f, 52.0f);
+            g.fillRect (x + gap * 0.5f - 1.0f, baseline - 44.0f, 2.0f, 44.0f);
             drawStyledText (g, right, x + gap, baseline, deviceH, faces);
         }
     }
 
+    // Riga di stato: quello che non appartiene a un singolo setup
+    {
+        StyledText row;
+        auto label = [&] (const juce::String& t, float gap = 0.62f)
+        { row.push_back (part (t, Style::regular, row.empty() ? 0.0f : gap, dim)); };
+        auto value = [&] (const juce::String& t)
+        { row.push_back (part (t, Style::bold, 0.16f, bright)); };
+        auto badge = [&] (const juce::String& t)
+        { row.push_back (part (t, Style::inverted, 0.62f, bright)); };
+
+        label ("BPM");
+        value (juce::String (st.bpm));
+        if (st.metronome)
+            row.push_back (part (st.beat ? "**" : "--", Style::bold, 0.2f,
+                                 st.beat ? bright : dim.withAlpha (0.5f)));
+
+        label ("MASTER");
+        if (st.masterMuted)
+            badge ("MUTO");
+        else
+            value (juce::String (juce::roundToInt (st.master * 100.0f)) + "%");
+
+        label ("SCENA");
+        value (st.scene >= 0 ? juce::String (st.scene + 1) : juce::String ("-"));
+
+        label (st.stripMod ? "MOD" : "PITCH");
+        const int sv = juce::roundToInt (st.strip * 127.0f);
+        row.push_back (part (st.stripMod ? juce::String (sv)
+                                         : (st.strip >= 0.5f ? "+" : "") + juce::String (juce::roundToInt ((st.strip - 0.5f) * 200.0f)),
+                             Style::bold, 0.16f, st.stripTouched ? bright : dim));
+
+        label (st.polyAftertouch ? "AT POLY" : "AT CH");
+        value (juce::String (st.aftertouch));
+
+        if (st.sustain)
+            badge ("SUSTAIN");
+        if (st.pedal2 > 0)
+            badge (st.pedal2Continuous ? "PEDALE " + juce::String (juce::roundToInt (st.pedal2 * 100.0f / 127.0f)) + "%"
+                                       : juce::String ("PEDALE 2"));
+        if (st.shift)
+            badge ("SHIFT");
+
+        drawStyledText (g, row, 12.0f, 124.0f, 17.0f, faces);
+    }
+
     // In basso: logo MBSTUDIO91, firmware, chi cambia i setup
-    juce::Font small (juce::FontOptions().withTypeface (faces.bebas).withHeight (22.0f));
-    const float baseline = 150.0f;
+    juce::Font small (juce::FontOptions().withTypeface (faces.bebas).withHeight (20.0f));
+    const float baseline = 152.0f;
     float footX = 12.0f;
 
     if (faces.logo.isValid())
     {
-        // Il logo e' alto come le maiuscole del testo che lo segue
         juce::GlyphArrangement cap;
         cap.addLineOfText (small, "M", 0.0f, 0.0f);
         juce::Path capPath;
@@ -325,20 +383,20 @@ juce::Image renderScreen (const std::vector<ScreenSetup>& setups, int active, in
     }
 
     juce::String footer = "STAGE";
-    if (firmware.isNotEmpty())
-        footer << "   -   PUSH 2 FW " << firmware;
+    if (st.firmware.isNotEmpty())
+        footer << "   -   PUSH 2 FW " << st.firmware;
     g.setColour (juce::Colour (0xff9a9a9a));
     g.setFont (small);
-    g.drawText (footer, (int) footX, 128, 600, 28, juce::Justification::centredLeft);
+    g.drawText (footer, (int) footX, 134, 520, 24, juce::Justification::centredLeft);
 
-    const float changerH = 22.0f;
+    const float changerH = 20.0f;
     const float changerW = drawStyledText (g, setupChanger, 0, 0, changerH, faces, false);
     const float changerX = 948.0f - changerW;
-    drawStyledText (g, setupChanger, changerX, 150.0f, changerH, faces);
+    drawStyledText (g, setupChanger, changerX, baseline, changerH, faces);
 
     g.setColour (juce::Colour (0xff9a9a9a));
     g.setFont (small);
-    g.drawText ("SETUP " + juce::String (active + 1) + "/" + juce::String ((int) setups.size()) + "  DA",
-                (int) changerX - 200, 128, 190, 28, juce::Justification::centredRight);
+    g.drawText ("SETUP " + juce::String (st.active + 1) + "/" + juce::String ((int) setups.size()) + "  DA",
+                (int) changerX - 200, 134, 190, 24, juce::Justification::centredRight);
     return img;
 }

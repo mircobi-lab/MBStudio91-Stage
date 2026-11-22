@@ -77,6 +77,21 @@ int encoderDelta (int ccValue)
     return ccValue < 64 ? ccValue : ccValue - 128;
 }
 
+int sceneButtonCC (int rowFromTop)
+{
+    return 43 - rowFromTop;
+}
+
+Bytes setAftertouchMode (bool polyphonic)
+{
+    return command (0x1E, { polyphonic ? (std::uint8_t) 1 : (std::uint8_t) 0 });
+}
+
+Bytes setTouchStripConfig (std::uint8_t flags)
+{
+    return command (0x17, { static_cast<std::uint8_t> (flags & 0x7F) });
+}
+
 Bytes identityRequest()
 {
     return { 0xF0, 0x7E, 0x01, 0x06, 0x01, 0xF7 };
