@@ -376,6 +376,9 @@ void MainComponent::timerCallback()
     if (statusMessage.isNotEmpty())
         text << statusMessage << "    ";
 
+    for (const auto& s : coordinator.surfaceStatus())
+        text << s << "    ";
+
     const auto& dm = engine.deviceManager();
     if (auto* dev = dm.getCurrentAudioDevice())
         text << "AUDIO " << dev->getName() << "  " << juce::String (dev->getCurrentSampleRate() / 1000.0, 1)

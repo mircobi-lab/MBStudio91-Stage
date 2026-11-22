@@ -15,6 +15,7 @@ public:
     void addSurface (ControlSurface&);
 
     SurfaceState buildState() const;
+    juce::StringArray surfaceStatus() const;   // le superfici collegate, per la riga di stato
     void handleAction (SurfaceAction);
     void handleTap (double nowSeconds);
 

@@ -55,27 +55,38 @@ void Push2Controller::restorePalette()
     originalPalette.clear();
 }
 
+std::optional<juce::MidiDeviceInfo> Push2Controller::choosePort (const juce::Array<juce::MidiDeviceInfo>& list,
+                                                                 bool preferUserPort)
+{
+    const char* wanted = preferUserPort ? "User" : "Live";
+    std::optional<juce::MidiDeviceInfo> fallback;
+
+    for (const auto& d : list)
+    {
+        if (! d.name.containsIgnoreCase ("Push 2"))
+            continue;
+        if (d.name.containsIgnoreCase (wanted))
+            return d;
+        if (! fallback.has_value())
+            fallback = d;
+    }
+    return fallback;
+}
+
+void Push2Controller::setUseUserPort (bool user)
+{
+    if (useUserPort == user)
+        return;
+    useUserPort = user;
+    reconnect();
+}
+
 void Push2Controller::reconnect()
 {
-    // La porta User e' quella che Live lascia libera: e' la nostra. Se non c'e'
-    // (Push in modalita' Live senza Live aperto) va bene la prima porta "Push 2".
-    auto findDevice = [] (const juce::Array<juce::MidiDeviceInfo>& list) -> juce::String
-    {
-        juce::String any;
-        for (const auto& d : list)
-        {
-            if (! d.name.containsIgnoreCase ("Push 2"))
-                continue;
-            if (d.name.containsIgnoreCase ("User"))
-                return d.identifier;
-            if (any.isEmpty())
-                any = d.identifier;
-        }
-        return any;
-    };
-
-    const auto inId = findDevice (juce::MidiInput::getAvailableDevices());
-    const auto outId = findDevice (juce::MidiOutput::getAvailableDevices());
+    const auto in = choosePort (juce::MidiInput::getAvailableDevices(), useUserPort);
+    const auto out = choosePort (juce::MidiOutput::getAvailableDevices(), useUserPort);
+    const auto inId = in.has_value() ? in->identifier : juce::String();
+    const auto outId = out.has_value() ? out->identifier : juce::String();
 
     const bool inChanged = input == nullptr || input->getIdentifier() != inId;
     const bool outChanged = output == nullptr || output->getIdentifier() != outId;
@@ -89,6 +100,8 @@ void Push2Controller::reconnect()
     input = nullptr;
     output = nullptr;
 
+    portName.clear();
+
     if (inId.isEmpty() || outId.isEmpty())
         return;   // Push non collegato: si riprova al prossimo cambio dei dispositivi
 
@@ -97,6 +110,7 @@ void Push2Controller::reconnect()
 
     if (output != nullptr)
     {
+        portName = out->name.contains ("User") ? "PORTA USER" : "PORTA LIVE";
         // Prima si chiedono le voci di palette che useremo, per poterle rimettere
         // a posto all'uscita, poi si impostano le nostre.
         send (Push2Mapping::readPaletteMessages());
