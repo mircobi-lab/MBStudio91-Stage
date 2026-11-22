@@ -8,8 +8,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Le prove del protocollo non hanno bisogno di JUCE: -DPUSH2_ONLY_TESTS=ON
 option(PUSH2_ONLY_TESTS "Compila solo le prove del protocollo" OFF)
 
-add_library(push2_protocol STATIC Source/Push2Protocol.cpp)
-target_include_directories(push2_protocol PUBLIC Source)
+# Il protocollo e il trasporto USB vivono con l'app Stage: una copia sola per tutti e due.
+set(PUSH2_SHARED ${CMAKE_CURRENT_SOURCE_DIR}/../../Source/push2)
+
+add_library(push2_protocol STATIC ${PUSH2_SHARED}/Push2Protocol.cpp)
+target_include_directories(push2_protocol PUBLIC ${PUSH2_SHARED} Source)
 
 add_executable(Push2ProtocolTests Tests/ProtocolTests.cpp)
 target_link_libraries(Push2ProtocolTests PRIVATE push2_protocol)
@@ -63,7 +66,7 @@ juce_add_binary_data(Push2TestAssets SOURCES
 target_sources(MBStudio91Push2Test PRIVATE
     Source/Main.cpp
     Source/MainComponent.cpp
-    Source/Push2Display.cpp
+    ${PUSH2_SHARED}/Push2Display.cpp
     Source/Push2Screen.cpp)
 
 target_compile_definitions(MBStudio91Push2Test PRIVATE

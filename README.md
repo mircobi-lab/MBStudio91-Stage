@@ -55,6 +55,30 @@ L'app non è firmata con un certificato Apple, quindi al primo avvio macOS la bl
 
 Al primo avvio parte da sola la ricerca dei plugin. Con molti plugin installati può richiedere qualche minuto; la riga in basso mostra quando ha finito.
 
+## Ableton Push 2
+
+Il Push 2 funziona come la Launchpad, da selettore di patch, e in piu' ha il display.
+
+| Sul Push | Cosa fa |
+|---|---|
+| i 64 pad | le 64 patch del banco mostrato, la prima in alto a sinistra |
+| 8 tasti sopra il display | i banchi A-H |
+| colonna a destra, dall'alto | mute delle quattro postazioni, patch precedente, successiva, TAP, PANIC |
+| PANIC | si tiene premuto mezzo secondo |
+| display | nome della patch, banco, numero, BPM e mute delle postazioni |
+
+Stage apre la porta **User** del Push se c'e': e' quella che Live lascia libera, cosi'
+le due cose convivono. Senza Live aperto va bene anche l'altra porta.
+
+I colori dei pad non sono fissi sul Push, quindi Stage si definisce le sei voci di
+palette che usa, dopo essersi fatto mandare quelle originali, e le rimette a posto
+quando esce: Live non si ritrova colori strani.
+
+Se il Push non e' collegato, il display va lo stesso sul visore di
+`tools/push2-test` (porta 127.0.0.1:48484), comodo per lavorare senza hardware.
+
+I VST suonano dal vivo e basta: Stage non registra e non crea tracce.
+
 ## Cartelle dei plugin
 
 Oltre alle cartelle standard del sistema puoi farne battere altre, per esempio quella
