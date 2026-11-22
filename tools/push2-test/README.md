@@ -65,6 +65,14 @@ Le prove del protocollo girano anche senza JUCE (dalla cartella `tools/push2-tes
 cmake -S . -B build -DPUSH2_ONLY_TESTS=ON && cmake --build build && ctest --test-dir build
 ```
 
+## Icona
+
+`Assets/brand/icon.png` (1024x1024) e' generata da `Assets/brand/make_icon.py`:
+telaio nero con angoli alla macOS, display incassato col marchio MBSTUDIO91 stampato
+e tre file di pad, l'ultima accesa coi colori dei LED MBStudio (blu, verde, ambra,
+rosso). Per rifarla: `python3 Assets/brand/make_icon.py`. CMake la passa a JUCE con
+`ICON_BIG` e il bundle .app si prende l'Icon.icns da sola.
+
 ## Licenze
 
 - Bebas Neue: lo stesso file di MBStudio91 Stage, SIL Open Font License (`Assets/Fonts/OFL.txt` nella radice).

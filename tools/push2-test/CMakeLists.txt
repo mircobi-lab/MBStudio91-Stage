@@ -45,6 +45,7 @@ juce_add_gui_app(MBStudio91Push2Test
     COMPANY_NAME "MBStudio91"
     BUNDLE_ID com.mbstudio91.push2test
     VERSION ${PROJECT_VERSION}
+    ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/Assets/brand/icon.png"
     MICROPHONE_PERMISSION_ENABLED FALSE
     NEEDS_CURL FALSE
     NEEDS_WEB_BROWSER FALSE)
