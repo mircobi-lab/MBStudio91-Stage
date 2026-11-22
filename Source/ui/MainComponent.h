@@ -4,6 +4,7 @@
 #include "engine/StageEngine.h"
 #include "plugins/PluginCatalog.h"
 #include "StationPanel.h"
+#include "PluginChooser.h"
 #include "PatchPanel.h"
 #include "control/SurfaceCoordinator.h"
 
@@ -27,6 +28,9 @@ private:
     void showAudioSettings();
     void startScan();
     void showScanMenu();
+    void showPluginChooser();
+    void loadChosenPlugins();
+    void saveChosenPlugins (const juce::StringArray&);
     void showScanFolders();
     void loadScanFolders();
     void saveScanFolders (const juce::StringArray&);
@@ -50,7 +54,7 @@ private:
     std::unique_ptr<PatchPanel> patchPanel;
 
     juce::String statusMessage;
-    juce::Component::SafePointer<juce::DialogWindow> audioSettingsWindow, foldersWindow;
+    juce::Component::SafePointer<juce::DialogWindow> audioSettingsWindow, foldersWindow, chooserWindow;
     std::unique_ptr<juce::FileChooser> chooser;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)

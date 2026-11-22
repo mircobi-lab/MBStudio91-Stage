@@ -1,7 +1,7 @@
 # Collaudo Fase 4, Ableton Push 2
 
 Il Push 2 risulta collegato al Mac mini: per questa prova spostalo sul MacBook, dove gira Stage.
-**Chiudi Ableton Live prima di iniziare**: tiene occupata l'interfaccia USB del display.
+**Chiudi Ableton Live prima di iniziare**: tiene occupata sia la porta MIDI su cui il Push ascolta, sia l'interfaccia USB del display.
 
 Segna ogni prova con OK o con quello che è successo.
 

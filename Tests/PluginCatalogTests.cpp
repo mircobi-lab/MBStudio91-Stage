@@ -47,6 +47,55 @@ public:
             expectEquals (PluginCatalog::searchPathFor (vst3, {}).getNumPaths(), standard.getNumPaths());
         }
 
+        beginTest ("elenca i file dei plugin senza aprirli");
+        {
+            juce::TemporaryFile listTmp2 (".xml"), pedalTmp2 (".txt");
+            juce::TemporaryFile dirTmp;
+            const auto dir = dirTmp.getFile();
+            dir.createDirectory();
+
+            // Finti bundle VST3 con la forma giusta ma senza codice dentro:
+            // aprirli fallirebbe, elencarli no.
+            for (const auto& name : { "Sylenth1", "Dune 2", "MuMU" })
+            {
+                const auto bundle = dir.getChildFile (juce::String (name) + ".vst3");
+               #if JUCE_MAC
+                auto binary = bundle.getChildFile ("Contents/MacOS").getChildFile (name);
+               #elif JUCE_WINDOWS
+                auto binary = bundle.getChildFile ("Contents/x86_64-win").getChildFile (juce::String (name) + ".vst3");
+               #else
+                auto binary = bundle.getChildFile ("Contents/x86_64-linux").getChildFile (juce::String (name) + ".so");
+               #endif
+                binary.getParentDirectory().createDirectory();
+                binary.replaceWithText ("finto");
+            }
+
+            PluginCatalog cat (listTmp2.getFile(), pedalTmp2.getFile());
+            cat.setExtraFolders ({ dir.getFullPathName() });
+
+            const auto found = cat.findPluginFiles();
+            juce::StringArray names;
+            for (const auto& f : found)
+                names.add (f.displayName);
+
+            expect (names.contains ("Sylenth1"), "Sylenth1 nell'elenco");
+            expect (names.contains ("Dune 2"), "Dune 2 nell'elenco");
+            expect (names.contains ("MuMU"), "MuMU nell'elenco");
+
+            // nessuno di questi e' stato aperto, quindi il catalogo resta vuoto
+            expectEquals (cat.list().getNumTypes(), 0);
+
+            for (const auto& f : found)
+            {
+                expect (f.key().contains ("|"), "la chiave e' formato|identificatore");
+                expect (! f.alreadyKnown);
+            }
+
+            beginTest ("la scelta si imposta e si rilegge, senza doppioni");
+            cat.setChosenPlugins ({ "VST3|/a", "VST3|/a", "", "VST3|/b" });
+            expectEquals (cat.getChosenPlugins().size(), 2);
+        }
+
         juce::TemporaryFile listTmp (".xml"), pedalTmp (".txt");
 
         beginTest ("salva e ricarica l'elenco dei plugin");

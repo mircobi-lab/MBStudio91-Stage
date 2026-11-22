@@ -47,6 +47,7 @@ public:
     virtual ~ControlSurface() = default;
     virtual juce::String getName() const = 0;
     virtual bool isConnected() const = 0;
+    virtual juce::String getDetail() const { return {}; }   // porta, modo: per la riga di stato
     virtual void showState (const SurfaceState&) = 0;   // message thread
 
     std::function<void (SurfaceAction)> onAction;       // chiamato sul message thread

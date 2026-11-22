@@ -55,6 +55,15 @@ SurfaceState SurfaceCoordinator::buildState() const
     return st;
 }
 
+juce::StringArray SurfaceCoordinator::surfaceStatus() const
+{
+    juce::StringArray out;
+    for (auto* s : surfaces)
+        if (s->isConnected())
+            out.add ((s->getName() + " " + s->getDetail()).trim().toUpperCase());
+    return out;
+}
+
 void SurfaceCoordinator::handleAction (SurfaceAction a)
 {
     switch (a.type)

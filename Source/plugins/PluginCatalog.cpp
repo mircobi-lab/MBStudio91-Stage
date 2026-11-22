@@ -1,6 +1,8 @@
 #include "PluginCatalog.h"
 #include "ScannerProcess.h"
 
+#include <algorithm>
+
 juce::String makePortableId (const juce::PluginDescription& d)
 {
     return d.pluginFormatName + "|" + d.manufacturerName + "|" + d.name + "|"
@@ -23,9 +25,10 @@ void addStageFormats (juce::AudioPluginFormatManager& fm)
 class PluginCatalog::ScanThread final : public juce::Thread
 {
 public:
-    ScanThread (PluginCatalog& c, juce::StringArray extra, std::function<void (int, juce::StringArray)> done)
+    ScanThread (PluginCatalog& c, juce::StringArray extra, juce::StringArray chosenKeys,
+                std::function<void (int, juce::StringArray)> done)
         : juce::Thread ("MBStudio91 Stage plugin scan"), catalog (c),
-          extraFolders (std::move (extra)), onDone (std::move (done)) {}
+          extraFolders (std::move (extra)), chosen (std::move (chosenKeys)), onDone (std::move (done)) {}
 
     ~ScanThread() override { stopThread (30000); }
 
@@ -34,15 +37,10 @@ public:
         const int before = catalog.knownList.getNumTypes();
         juce::StringArray failed;
 
-        for (auto* format : catalog.formatManager.getFormats())
-        {
-            juce::PluginDirectoryScanner scanner (catalog.knownList, *format,
-                                                  PluginCatalog::searchPathFor (*format, extraFolders),
-                                                  true, catalog.deadMansPedal, false);
-            juce::String name;
-            while (! threadShouldExit() && scanner.scanNextFile (true, name)) {}
-            failed.addArray (scanner.getFailedFiles());
-        }
+        if (chosen.isEmpty())
+            scanEverything (failed);
+        else
+            scanChosen (failed);
 
         catalog.knownList.scanFinished();
 
@@ -59,8 +57,85 @@ public:
     }
 
 private:
+    void report (int done, int total, const juce::String& name)
+    {
+        if (name == lastReported)
+            return;
+        lastReported = name;
+
+        juce::MessageManager::callAsync ([safe = juce::WeakReference<ScanThread> (this), done, total, name]
+        {
+            if (auto* self = safe.get())
+                if (self->catalog.onScanProgress)
+                    self->catalog.onScanProgress (done, total, name);
+        });
+    }
+
+    // Tutto quello che c'e' nelle cartelle, come prima, con il file "scan in corso"
+    // che protegge dai plugin che fanno cadere la scansione.
+    void scanEverything (juce::StringArray& failed)
+    {
+        const int total = (int) catalog.findPluginFiles().size();
+        int done = 0;
+
+        for (auto* format : catalog.formatManager.getFormats())
+        {
+            juce::PluginDirectoryScanner scanner (catalog.knownList, *format,
+                                                  PluginCatalog::searchPathFor (*format, extraFolders),
+                                                  true, catalog.deadMansPedal, false);
+            juce::String name;
+            while (! threadShouldExit())
+            {
+                report (done, total, scanner.getNextPluginFileThatWillBeScanned());
+                if (! scanner.scanNextFile (true, name))
+                    break;
+                ++done;
+            }
+            failed.addArray (scanner.getFailedFiles());
+        }
+    }
+
+    // Soltanto i plugin spuntati: ognuno viene aperto nel processo figlio, uno per volta.
+    void scanChosen (juce::StringArray& failed)
+    {
+        const int total = chosen.size();
+        int done = 0;
+
+        for (const auto& key : chosen)
+        {
+            if (threadShouldExit())
+                return;
+
+            const auto formatName = key.upToFirstOccurrenceOf ("|", false, false);
+            const auto identifier = key.fromFirstOccurrenceOf ("|", false, false);
+
+            juce::AudioPluginFormat* format = nullptr;
+            for (auto* f : catalog.formatManager.getFormats())
+                if (f->getName() == formatName)
+                    format = f;
+
+            if (format == nullptr)
+            {
+                failed.add (identifier);
+                ++done;
+                continue;
+            }
+
+            report (done, total, format->getNameOfPluginFromIdentifier (identifier));
+
+            juce::OwnedArray<juce::PluginDescription> types;
+            catalog.knownList.scanAndAddFile (identifier, true, types, *format);
+            if (types.isEmpty() && catalog.knownList.getBlacklistedFiles().contains (identifier))
+                failed.add (identifier);
+
+            ++done;
+        }
+        report (total, total, {});
+    }
+
     PluginCatalog& catalog;
-    juce::StringArray extraFolders;
+    juce::StringArray extraFolders, chosen;
+    juce::String lastReported;
     std::function<void (int, juce::StringArray)> onDone;
 
     JUCE_DECLARE_WEAK_REFERENCEABLE (ScanThread)
@@ -94,6 +169,59 @@ juce::FileSearchPath PluginCatalog::searchPathFor (juce::AudioPluginFormat& form
             path.addIfNotAlreadyThere (dir);
     }
     return path;
+}
+
+std::vector<PluginCatalog::FoundPlugin> PluginCatalog::findPluginFiles() const
+{
+    std::vector<FoundPlugin> out;
+    juce::StringArray seen;
+
+    for (auto* format : formatManager.getFormats())
+    {
+        // searchPathsForPlugins guarda i nomi dei file, non apre niente
+        const auto files = format->searchPathsForPlugins (searchPathFor (*format, extraFolders), true, false);
+        for (const auto& f : files)
+        {
+            FoundPlugin p;
+            p.formatName = format->getName();
+            p.fileOrIdentifier = f;
+            // Per i VST3 JUCE restituisce il percorso intero: in quel caso si prende
+            // il nome del file, che e' quello che l'utente riconosce.
+            auto name = format->getNameOfPluginFromIdentifier (f);
+            if (name.isEmpty() || name == f || name.containsChar (juce::File::getSeparatorChar()))
+                name = juce::File::createFileWithoutCheckingPath (f).getFileNameWithoutExtension();
+            p.displayName = name.isNotEmpty() ? name : f;
+
+            if (seen.contains (p.key()))
+                continue;
+            seen.add (p.key());
+
+            for (const auto& known : knownList.getTypes())
+                if (known.fileOrIdentifier == f)
+                    p.alreadyKnown = true;
+
+            out.push_back (std::move (p));
+        }
+    }
+
+    std::sort (out.begin(), out.end(), [] (const FoundPlugin& a, const FoundPlugin& b)
+               { return a.displayName.compareIgnoreCase (b.displayName) < 0; });
+    return out;
+}
+
+void PluginCatalog::setChosenPlugins (juce::StringArray keys)
+{
+    keys.removeEmptyStrings();
+    keys.removeDuplicates (true);
+    chosenPlugins = std::move (keys);
+}
+
+juce::StringArray PluginCatalog::getChosenPlugins() const { return chosenPlugins; }
+
+void PluginCatalog::stopScan()
+{
+    if (scanThread != nullptr)
+        scanThread->signalThreadShouldExit();
 }
 
 void PluginCatalog::setExtraFolders (juce::StringArray folders)
@@ -141,7 +269,7 @@ void PluginCatalog::scanAsync (std::function<void (int, juce::StringArray)> onDo
         return;
 
     knownList.setCustomScanner (ScannerProcess::makeOutOfProcessScanner());
-    scanThread = std::make_unique<ScanThread> (*this, extraFolders, std::move (onDone));
+    scanThread = std::make_unique<ScanThread> (*this, extraFolders, chosenPlugins, std::move (onDone));
     scanThread->startThread();
 }
 

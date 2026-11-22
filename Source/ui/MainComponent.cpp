@@ -78,6 +78,9 @@ MainComponent::~MainComponent()
         delete w;
     if (auto* w = foldersWindow.getComponent())
         delete w;
+    if (auto* w = chooserWindow.getComponent())
+        delete w;
+    catalog.onScanProgress = nullptr;
 }
 
 void MainComponent::paint (juce::Graphics& g)
@@ -146,17 +149,67 @@ void MainComponent::showAudioSettings()
 void MainComponent::showScanMenu()
 {
     juce::PopupMenu m;
-    m.addItem (1, "Scansiona adesso", ! catalog.isScanning());
+    m.addItem (1, "Scegli i plugin da scansionare...", ! catalog.isScanning());
+    m.addItem (3, "Scansiona tutto adesso", ! catalog.isScanning());
+    m.addSeparator();
     m.addItem (2, "Cartelle in piu'...");
+    if (catalog.isScanning())
+        m.addItem (4, "Ferma la scansione");
     m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (scanButton),
                      [safe = juce::Component::SafePointer<MainComponent> (this)] (int choice)
     {
         if (auto* self = safe.getComponent())
         {
-            if (choice == 1) self->startScan();
+            if (choice == 1) self->showPluginChooser();
             if (choice == 2) self->showScanFolders();
+            if (choice == 3) { self->saveChosenPlugins ({}); self->startScan(); }
+            if (choice == 4) self->catalog.stopScan();
         }
     });
+}
+
+void MainComponent::loadChosenPlugins()
+{
+    juce::StringArray keys;
+    keys.addLines (AppPaths::chosenPluginsFile().loadFileAsString());
+    keys.trim();
+    keys.removeEmptyStrings();
+    catalog.setChosenPlugins (keys);
+}
+
+void MainComponent::saveChosenPlugins (const juce::StringArray& keys)
+{
+    catalog.setChosenPlugins (keys);
+    AppPaths::chosenPluginsFile().replaceWithText (catalog.getChosenPlugins().joinIntoString ("\n"));
+}
+
+void MainComponent::showPluginChooser()
+{
+    if (auto* w = chooserWindow.getComponent())
+    {
+        w->toFront (true);
+        return;
+    }
+
+    auto* chooser = new PluginChooser (catalog,
+        [safe = juce::Component::SafePointer<MainComponent> (this)] (juce::StringArray keys)
+        {
+            if (auto* self = safe.getComponent())
+            {
+                self->saveChosenPlugins (keys);
+                if (auto* w = self->chooserWindow.getComponent())
+                    w->exitModalState (0);
+                self->startScan();
+            }
+        });
+
+    juce::DialogWindow::LaunchOptions o;
+    o.content.setOwned (chooser);
+    o.dialogTitle = "Plugin da scansionare";
+    o.dialogBackgroundColour = juce::Colours::black;
+    o.useNativeTitleBar = true;
+    o.resizable = true;
+    chooserWindow = o.launchAsync();
 }
 
 void MainComponent::loadScanFolders()
@@ -244,14 +297,25 @@ void MainComponent::startScan()
     if (catalog.isScanning())
         return;
 
-    statusMessage = "Scansione in corso su " + juce::String (catalog.foldersToScan().size()) + " cartelle...";
-    scanButton.setEnabled (false);
+    const auto chosenCount = catalog.getChosenPlugins().size();
+    statusMessage = chosenCount > 0 ? "Scansione di " + juce::String (chosenCount) + " plugin scelti..."
+                                    : "Scansione di tutte le cartelle...";
+    scanButton.setButtonText ("SCANSIONE...");
+
+    catalog.onScanProgress = [safe = juce::Component::SafePointer<MainComponent> (this)]
+                             (int done, int total, juce::String name)
+    {
+        if (auto* self = safe.getComponent())
+            self->statusMessage = "Scansione " + juce::String (done) + "/" + juce::String (total)
+                                + (name.isEmpty() ? juce::String() : "   " + name);
+    };
 
     catalog.scanAsync ([safe = juce::Component::SafePointer<MainComponent> (this)] (int found, juce::StringArray failed)
     {
         if (auto* self = safe.getComponent())
         {
-            self->scanButton.setEnabled (true);
+            self->catalog.onScanProgress = nullptr;
+            self->scanButton.setButtonText ("SCANSIONA PLUGIN");
             self->statusMessage = "Scansione finita: " + juce::String (found) + " plugin nuovi"
                                 + (failed.isEmpty() ? juce::String() : ", " + juce::String (failed.size()) + " scartati");
             for (auto& p : self->panels)
@@ -263,6 +327,7 @@ void MainComponent::startScan()
 void MainComponent::startInitialScanIfNeeded (bool listFileExisted)
 {
     loadScanFolders();
+    loadChosenPlugins();
 
     if (! listFileExisted)
         startScan();
@@ -310,6 +375,9 @@ void MainComponent::timerCallback()
     juce::String text;
     if (statusMessage.isNotEmpty())
         text << statusMessage << "    ";
+
+    for (const auto& s : coordinator.surfaceStatus())
+        text << s << "    ";
 
     const auto& dm = engine.deviceManager();
     if (auto* dev = dm.getCurrentAudioDevice())
