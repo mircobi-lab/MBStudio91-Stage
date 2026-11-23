@@ -31,7 +31,7 @@ MainComponent::MainComponent()
     faces.logoBold  = juce::Typeface::createSystemTypefaceFor (BinaryData::ComfortaaBold_ttf, BinaryData::ComfortaaBold_ttfSize);
     faces.script = juce::Typeface::createSystemTypefaceFor (BinaryData::YellowtailRegular_ttf, BinaryData::YellowtailRegular_ttfSize);
     faces.square = juce::Typeface::createSystemTypefaceFor (BinaryData::QuanticoRegular_ttf, BinaryData::QuanticoRegular_ttfSize);
-    faces.logo = juce::ImageCache::getFromMemory (BinaryData::mbstudio91wordmark_png, BinaryData::mbstudio91wordmark_pngSize);
+    faces.logo = juce::ImageCache::getFromMemory (BinaryData::mbstudio91_wordmark_png, BinaryData::mbstudio91_wordmark_pngSize);
     auto font = [this] (float h) { return juce::Font (juce::FontOptions().withTypeface (bebas).withHeight (h)); };
 
     title.setText ("MBSTUDIO91 STAGE  -  TEST PUSH 2", juce::dontSendNotification);

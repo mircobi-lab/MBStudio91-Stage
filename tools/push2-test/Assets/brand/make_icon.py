@@ -82,7 +82,8 @@ def main():
         outline=RECESS_EDGE + (255,), width=round(2 * S))
     img.alpha_composite(ring)
 
-    mark = Image.open(os.path.join(HERE, "mbstudio91-wordmark.png")).convert("RGBA")
+    mark = Image.open(os.path.join(HERE, "..", "..", "..", "..", "Assets", "brand",
+                                   "mbstudio91_wordmark.png")).convert("RGBA")
     mw = round(inner_w * 0.78)
     mh = round(mw * mark.size[1] / mark.size[0])
     mark = mark.resize((mw, mh), Image.LANCZOS)

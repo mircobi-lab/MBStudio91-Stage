@@ -19,8 +19,8 @@ ViewerComponent::ViewerComponent()
 {
     bebas = juce::Typeface::createSystemTypefaceFor (BinaryData::BebasNeueRegular_ttf,
                                                      BinaryData::BebasNeueRegular_ttfSize);
-    logo = juce::ImageCache::getFromMemory (BinaryData::mbstudio91wordmark_png,
-                                            BinaryData::mbstudio91wordmark_pngSize);
+    logo = juce::ImageCache::getFromMemory (BinaryData::mbstudio91_wordmark_png,
+                                            BinaryData::mbstudio91_wordmark_pngSize);
 
     server = std::make_unique<FrameServer> ([this] (juce::Image img)
     {

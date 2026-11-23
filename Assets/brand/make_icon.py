@@ -92,7 +92,7 @@ def main():
     paste_rounded_gradient(img, (pad_x, disp_y, inner_w, disp_h), disp_r, RECESS, RECESS)
     outline(img, (pad_x, disp_y, inner_w, disp_h), disp_r, RECESS_EDGE, 255, round(2 * S))
 
-    mark = Image.open(os.path.join(HERE, "mbstudio91-wordmark.png")).convert("RGBA")
+    mark = Image.open(os.path.join(HERE, "mbstudio91_wordmark.png")).convert("RGBA")
     mw = round(inner_w * 0.78)
     mh = round(mw * mark.size[1] / mark.size[0])
     mark = mark.resize((mw, mh), Image.LANCZOS)
