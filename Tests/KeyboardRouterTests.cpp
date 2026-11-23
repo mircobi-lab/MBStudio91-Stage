@@ -89,6 +89,19 @@ public:
             expect (! b.assignmentFor (1).has_value());
         }
 
+        beginTest ("l'intestazione dice che periferica e'");
+        {
+            using K = KeyboardRouter;
+            auto label = [] (const char* n) { return K::kindLabel (K::kindForDeviceName (n)); };
+
+            expectEquals (label ("Keystation 88 MK3"), juce::String ("KEYB"));
+            expectEquals (label ("Launchkey 49 MK3 MIDI"), juce::String ("KEYB"));
+            expectEquals (label ("Ableton Push 2 Live Port"), juce::String ("SURF"));
+            expectEquals (label ("Launchpad Mini"), juce::String ("SURF"));
+            expectEquals (label ("Scarlett 2i4 USB"), juce::String ("MIDI"));
+            expectEquals (label (""), juce::String ("MIDI"));
+        }
+
         beginTest ("nuovi file di impostazioni");
         expectEquals (AppPaths::keyboardsFile().getFileName(), juce::String ("tastiere.xml"));
         expectEquals (AppPaths::stationsFile().getFileName(), juce::String ("postazioni.xml"));

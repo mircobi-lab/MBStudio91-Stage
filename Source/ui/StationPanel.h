@@ -38,8 +38,11 @@ private:
     const int index;
     Station& station;
 
+    juce::String stationLabel() const;   // "1  KEYB", "2  SURF", "3  LIBERA"
+
     juce::Label title, deviceLabel, errorLabel;
-    juce::TextButton assignButton { "ASSEGNA" }, muteButton { "MUTE" }, faderButton { "FADER VOL" };
+    juce::TextButton assignButton { "ASSEGNA" }, muteButton { "MUTE" },
+                     faderButton { "FADER VOL" }, lockButton { "LOCK" };
     std::array<juce::Label, numSlots> slotLabels;
     std::array<juce::ComboBox, numSlots> slotMenus;
     std::array<juce::TextButton, numSlots> openButtons;

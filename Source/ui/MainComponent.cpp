@@ -26,9 +26,6 @@ MainComponent::MainComponent (StageEngine& e, PluginCatalog& c, PatchManager& pm
     patchPanel->onLibraryChanged = [this] { if (onLibraryChanged) onLibraryChanged(); };
     addAndMakeVisible (*patchPanel);
 
-    title.setText ("MBSTUDIO91(TM) STAGE", juce::dontSendNotification);
-    title.setFont (StageLookAndFeel::titleFont (34.0f));
-    addAndMakeVisible (title);
 
     for (auto* b : { &audioButton, &scanButton, &panicButton })
         addAndMakeVisible (*b);
@@ -86,6 +83,8 @@ MainComponent::~MainComponent()
 void MainComponent::paint (juce::Graphics& g)
 {
     g.fillAll (juce::Colours::black);
+    brand.paintPrinted (g, brandArea, "STAGE");
+    brand.paintDebossed (g, debossArea);
 }
 
 void MainComponent::resized()
@@ -106,9 +105,11 @@ void MainComponent::resized()
     tapButton.setBounds (top.removeFromRight (70).reduced (2));
     bpm.setBounds (top.removeFromRight (160).reduced (2, 8));
     tempoSourceButton.setBounds (top.removeFromRight (60).reduced (2));
-    title.setBounds (top);
+    brandArea = top;
 
-    statusLabel.setBounds (r.removeFromBottom (28));
+    auto bottom = r.removeFromBottom (28);
+    debossArea = bottom.removeFromRight (150);
+    statusLabel.setBounds (bottom);
     r.removeFromTop (12);
     r.removeFromBottom (8);
 

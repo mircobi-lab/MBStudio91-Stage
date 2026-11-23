@@ -4,7 +4,8 @@
 namespace
 {
     const juce::Identifier zoneId ("ZONE"), transposeId ("transpose"), lowId ("lowNote"), highId ("highNote"),
-                           curveId ("curve"), gammaId ("customGamma"), faderId ("faderControlsVolume");
+                           curveId ("curve"), gammaId ("customGamma"), faderId ("faderControlsVolume"),
+                           lockId ("volumeLocked");
 
     float gammaFor (VelocityCurve c, float custom)
     {
@@ -29,6 +30,7 @@ juce::ValueTree KeyZone::toValueTree() const
     t.setProperty (curveId, (int) curve, nullptr);
     t.setProperty (gammaId, customGamma, nullptr);
     t.setProperty (faderId, faderControlsVolume, nullptr);
+    t.setProperty (lockId, volumeLocked, nullptr);
     return t;
 }
 
@@ -43,6 +45,7 @@ KeyZone KeyZone::fromValueTree (const juce::ValueTree& t)
     z.curve     = (VelocityCurve) juce::jlimit (0, 3, (int) t.getProperty (curveId, 0));
     z.customGamma = juce::jlimit (0.3f, 3.0f, (float) t.getProperty (gammaId, 1.0f));
     z.faderControlsVolume = (bool) t.getProperty (faderId, false);
+    z.volumeLocked = (bool) t.getProperty (lockId, false);
     return z;
 }
 
@@ -50,7 +53,8 @@ bool KeyZone::operator== (const KeyZone& o) const
 {
     return transpose == o.transpose && lowNote == o.lowNote && highNote == o.highNote
         && curve == o.curve && juce::approximatelyEqual (customGamma, o.customGamma)
-        && faderControlsVolume == o.faderControlsVolume;
+        && faderControlsVolume == o.faderControlsVolume
+        && volumeLocked == o.volumeLocked;
 }
 
 int applyVelocityCurve (int v, VelocityCurve c, float customGamma)
@@ -137,7 +141,7 @@ void NoteProcessor::process (const juce::MidiBuffer& in, juce::MidiBuffer& out, 
             if (played >= 0)
                 out.addEvent (juce::MidiMessage::aftertouchChange (ch, played, m.getAfterTouchValue()), meta.samplePosition);
         }
-        else if (z.faderControlsVolume && m.isControllerOfType (7))
+        else if (z.faderControlsVolume && ! z.volumeLocked && m.isControllerOfType (7))
         {
             faderDb = faderValueToDb (m.getControllerValue());
         }

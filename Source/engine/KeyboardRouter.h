@@ -29,6 +29,11 @@ public:
 
     static int suggestStationForDeviceName (const juce::String& name);
 
+    // Che periferica e': serve all'intestazione della postazione.
+    enum class DeviceKind { keyboard, surface, other };
+    static DeviceKind kindForDeviceName (const juce::String& name);
+    static juce::String kindLabel (DeviceKind);   // KEYB, SURF, MIDI
+
     std::unique_ptr<juce::XmlElement> toXml() const;
     void fromXml (const juce::XmlElement&);
 

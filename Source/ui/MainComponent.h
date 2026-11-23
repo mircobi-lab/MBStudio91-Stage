@@ -7,6 +7,7 @@
 #include "PluginChooser.h"
 #include "PatchPanel.h"
 #include "control/SurfaceCoordinator.h"
+#include "StageLookAndFeel.h"
 
 // Finestra principale: barra superiore, 4 postazioni affiancate, riga di stato.
 class MainComponent final : public juce::Component,
@@ -44,6 +45,8 @@ private:
 
     juce::TextButton audioButton { "IMPOSTAZIONI AUDIO" }, scanButton { "SCANSIONA PLUGIN" },
                      panicButton { "PANIC" };
+    MBStudioBrand brand;
+    juce::Rectangle<int> brandArea, debossArea;
     juce::Label title, statusLabel, clockLabel { {}, "CLOCK DA" }, clockLost;
     juce::TextButton tempoSourceButton { "INT" }, tapButton { "TAP" };
     juce::Slider bpm { juce::Slider::IncDecButtons, juce::Slider::TextBoxLeft };
