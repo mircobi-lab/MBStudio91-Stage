@@ -6,9 +6,10 @@
 #include "Push2Mapping.h"
 #include "push2/Push2Display.h"
 
-// Ableton Push 2 come selettore di patch. Apre la porta Live, che e' quella che il
-// Push ascolta appena si accende; la User risponde solo dopo aver premuto USER sul
-// Push, quindi la si usa solo se richiesta. Aggiorna i LED a 20 Hz,
+// Ableton Push 2 come selettore di patch. Lavora sulla porta User, lasciando libera
+// la Live per Ableton, e dice al Push di passare in User mode: appena acceso e' in
+// Live mode e quello che arriva sulla User lo ignora. All'uscita lo rimette in Live
+// mode. Aggiorna i LED a 20 Hz,
 // scrive il nome della patch sul display e tratta PANIC come pressione lunga.
 class Push2Controller final : public ControlSurface,
                               private juce::Timer,
@@ -28,6 +29,10 @@ public:
     static std::optional<juce::MidiDeviceInfo> choosePort (const juce::Array<juce::MidiDeviceInfo>&,
                                                            bool preferUserPort);
     void setUseUserPort (bool);
+
+private:
+    static juce::MidiMessage sysexFor (const std::vector<std::uint8_t>&);
+public:
     bool isConnected() const override;
     void showState (const SurfaceState&) override;
 
@@ -52,7 +57,7 @@ private:
     bool needsFullRefresh = true, screenDirty = true;
     std::vector<juce::MidiMessage> originalPalette;   // voci lette dal Push, per rimetterle
     juce::String portName;
-    bool useUserPort = false;
+    bool useUserPort = true;
 
     juce::uint32 panicPressedAt = 0;
     bool panicPressed = false, panicFired = false;

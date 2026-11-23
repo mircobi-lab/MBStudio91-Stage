@@ -89,6 +89,12 @@ using Bytes = std::vector<std::uint8_t>;
 
 Bytes identityRequest();
 Bytes setAftertouchMode (bool polyphonic);       // comando 0x1E: 0 = channel pressure, 1 = poly
+
+// Comando 0x0A. Il Push si accende in Live mode, e in Live mode quello che arriva
+// sulla porta User lo butta via: per parlarci dalla User bisogna dirglielo.
+// Il sysex invece lo ascolta da tutte e due le porte, sempre.
+constexpr std::uint8_t midiModeLive = 0, midiModeUser = 1, midiModeDual = 2;
+Bytes setMidiMode (std::uint8_t mode);
 Bytes setTouchStripConfig (std::uint8_t flags);  // comando 0x17: vedi stripPitchBend / stripModWheel                     // F0 7E 01 06 01 F7
 Bytes setPaletteEntry (int index, std::uint8_t r, std::uint8_t g, std::uint8_t b, std::uint8_t w);
 Bytes reapplyPalette();                      // comando 0x05

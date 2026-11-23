@@ -1,3 +1,4 @@
+#include "push2/Push2Protocol.h"
 #include "control/Push2Controller.h"
 
 // Il Push 2 presenta due porte MIDI. Appena si accende e' in modalita' Live e
@@ -69,3 +70,27 @@ public:
 };
 
 static Push2PortTests push2PortTests;
+
+// Il comando che fa passare il Push in User mode. I byte sono quelli dell'esempio
+// del manuale Ableton: [F0 00 21 1D 01 01 0A 01 F7] = set MIDI mode to User.
+class Push2MidiModeTests final : public juce::UnitTest
+{
+public:
+    Push2MidiModeTests() : juce::UnitTest ("Push2 MIDI mode", "Stage") {}
+
+    void runTest() override
+    {
+        beginTest ("User mode, Live mode, Dual mode");
+        {
+            const std::vector<std::uint8_t> user { 0xF0, 0x00, 0x21, 0x1D, 0x01, 0x01, 0x0A, 0x01, 0xF7 };
+            expect (push2::setMidiMode (push2::midiModeUser) == user);
+
+            const std::vector<std::uint8_t> live { 0xF0, 0x00, 0x21, 0x1D, 0x01, 0x01, 0x0A, 0x00, 0xF7 };
+            expect (push2::setMidiMode (push2::midiModeLive) == live);
+
+            expectEquals ((int) push2::setMidiMode (push2::midiModeDual)[7], 2);
+        }
+    }
+};
+
+static Push2MidiModeTests push2MidiModeTests;

@@ -115,6 +115,11 @@ Bytes setAftertouchMode (bool polyphonic)
     return command (0x1E, { polyphonic ? (std::uint8_t) 1 : (std::uint8_t) 0 });
 }
 
+Bytes setMidiMode (std::uint8_t mode)
+{
+    return command (0x0A, { static_cast<std::uint8_t> (mode & 0x7F) });
+}
+
 Bytes setTouchStripConfig (std::uint8_t flags)
 {
     return command (0x17, { static_cast<std::uint8_t> (flags & 0x7F) });

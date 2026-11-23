@@ -21,6 +21,7 @@ Push2Controller::~Push2Controller()
     {
         send (Push2Mapping::allOffMessages());
         restorePalette();
+        send ({ sysexFor (push2::setMidiMode (push2::midiModeLive)) });
     }
 
     if (input != nullptr)
@@ -43,6 +44,11 @@ void Push2Controller::send (const std::vector<juce::MidiMessage>& msgs)
         return;
     for (const auto& m : msgs)
         output->sendMessageNow (m);
+}
+
+juce::MidiMessage Push2Controller::sysexFor (const std::vector<std::uint8_t>& b)
+{
+    return juce::MidiMessage::createSysExMessage (b.data() + 1, (int) b.size() - 2);
 }
 
 void Push2Controller::restorePalette()
@@ -111,6 +117,10 @@ void Push2Controller::reconnect()
     if (output != nullptr)
     {
         portName = out->name.contains ("User") ? "PORTA USER" : "PORTA LIVE";
+
+        // Senza questo, in Live mode il Push butta via quello che gli mandiamo
+        send ({ sysexFor (push2::setMidiMode (useUserPort ? push2::midiModeUser
+                                                          : push2::midiModeLive)) });
         // Prima si chiedono le voci di palette che useremo, per poterle rimettere
         // a posto all'uscita, poi si impostano le nostre.
         send (Push2Mapping::readPaletteMessages());
